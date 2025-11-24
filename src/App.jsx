@@ -103,35 +103,141 @@ function App() {
   }
 
   // Send a message
-  const sendMessage = (e) => {
+  const sendMessage = async (e) => {
     e.preventDefault()
     if (!inputValue.trim() || !activeConversation || !activeTab) return
 
     const userMessage = { role: 'user', content: inputValue }
-    const assistantMessage = {
-      role: 'assistant',
-      content: `This is a demo response to: "${inputValue}". In a real implementation, this would be a response from Claude.`
-    }
+    const currentInput = inputValue
+    setInputValue('')
 
-    setConversations(conversations.map(conv => {
+    // Add user message immediately
+    const isFirstMessage = activeTab.messages.length === 0 && activeConversation.name === 'Untitled'
+    const newConversationName = isFirstMessage
+      ? currentInput.slice(0, 50) + (currentInput.length > 50 ? '...' : '')
+      : activeConversation.name
+
+    setConversations(prevConvs => prevConvs.map(conv => {
       if (conv.id !== activeConversationId) return conv
-
-      // Update conversation name based on first message (up to 50 chars)
-      const isFirstMessage = activeTab.messages.length === 0 && conv.name === 'Untitled'
-      const newName = isFirstMessage ? inputValue.slice(0, 50) + (inputValue.length > 50 ? '...' : '') : conv.name
-
       return {
         ...conv,
-        name: newName,
+        name: newConversationName,
         tabs: conv.tabs.map(tab =>
           tab.id === activeTab.id
-            ? { ...tab, messages: [...tab.messages, userMessage, assistantMessage] }
+            ? { ...tab, messages: [...tab.messages, userMessage] }
             : tab
         )
       }
     }))
 
-    setInputValue('')
+    // Prepare assistant message placeholder
+    const assistantMessageId = Date.now()
+    setConversations(prevConvs => prevConvs.map(conv => {
+      if (conv.id !== activeConversationId) return conv
+      return {
+        ...conv,
+        tabs: conv.tabs.map(tab =>
+          tab.id === activeTab.id
+            ? { ...tab, messages: [...tab.messages, { role: 'assistant', content: '', id: assistantMessageId }] }
+            : tab
+        )
+      }
+    }))
+
+    try {
+      // Build conversation history for API
+      const apiMessages = activeTab.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
+      apiMessages.push({ role: 'user', content: currentInput })
+
+      // Call streaming API
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: apiMessages,
+          model: 'claude-opus-4-20250514'
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('API request failed')
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let accumulatedContent = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6)
+            if (data === '[DONE]') break
+
+            try {
+              const parsed = JSON.parse(data)
+              if (parsed.text) {
+                accumulatedContent += parsed.text
+
+                // Update the assistant message with accumulated content
+                setConversations(prevConvs => prevConvs.map(conv => {
+                  if (conv.id !== activeConversationId) return conv
+                  return {
+                    ...conv,
+                    tabs: conv.tabs.map(tab =>
+                      tab.id === activeTab.id
+                        ? {
+                            ...tab,
+                            messages: tab.messages.map(msg =>
+                              msg.id === assistantMessageId
+                                ? { ...msg, content: accumulatedContent }
+                                : msg
+                            )
+                          }
+                        : tab
+                    )
+                  }
+                }))
+              }
+            } catch (parseError) {
+              // Ignore parse errors for incomplete chunks
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error sending message:', error)
+
+      // Update assistant message with error
+      setConversations(prevConvs => prevConvs.map(conv => {
+        if (conv.id !== activeConversationId) return conv
+        return {
+          ...conv,
+          tabs: conv.tabs.map(tab =>
+            tab.id === activeTab.id
+              ? {
+                  ...tab,
+                  messages: tab.messages.map(msg =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, content: 'Sorry, there was an error processing your request. Please try again.' }
+                      : msg
+                  )
+                }
+              : tab
+          )
+        }
+      }))
+    }
   }
 
   return (

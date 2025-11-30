@@ -4,16 +4,35 @@ import {
   X,
   BookOpen,
   ArrowRight,
+  ArrowUp,
   Sparkles,
-  Layers,
   Loader2,
-  Menu,
   Plus,
-  Settings,
   Save,
   Keyboard,
-  Search
+  Search,
+  Code,
+  MessageCircle,
+  FolderOpen,
+  Blocks,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  ThumbsUp,
+  ThumbsDown,
+  RotateCcw,
+  Sliders,
+  PanelLeftClose,
+  PanelLeft,
+  GraduationCap,
+  Star,
+  User,
+  Target,
+  Lightbulb,
+  History
 } from 'lucide-react';
+import MarkdownRenderer from './components/MarkdownRenderer';
+import ArtifactPreview from './components/ArtifactPreview';
 
 // --- Design System Constants ---
 const COLORS = {
@@ -33,35 +52,6 @@ const FONTS = {
   sans: 'font-sans',
 };
 
-// --- Helper: Text Parsing with Chips ---
-const ContentWithChips = ({ text, onChipClick, isSerif = true }) => {
-  if (!text) return null;
-  const parts = text.split(/(%%.*?%%)/g);
-  return (
-    <span className={`leading-relaxed ${isSerif ? FONTS.serif : FONTS.sans}`}>
-      {parts.map((part, i) => {
-        if (part.startsWith('%%') && part.endsWith('%%')) {
-          const content = part.slice(2, -2);
-          return (
-            <span
-                key={i}
-                onClick={(e) => { e.stopPropagation(); onChipClick(content); }}
-                className="inline-block border-b-2 cursor-pointer transition-all duration-200 hover:bg-orange-100 mx-[1px] px-[2px] rounded-[2px]"
-                style={{
-                    borderColor: COLORS.highlightBorder,
-                    backgroundColor: COLORS.highlight,
-                }}
-            >
-                {content}
-            </span>
-          );
-        }
-        return <span key={i}>{part}</span>;
-      })}
-    </span>
-  );
-};
-
 // --- Mock Data ---
 const DEFAULT_PRELOADED_SUMMARIES = {
   "React Three Fiber": "A React renderer for Three.js.",
@@ -72,19 +62,8 @@ const DEFAULT_PRELOADED_SUMMARIES = {
 
 const DEFAULT_CHAT = {
   id: 'chat-1',
-  title: 'Help me build a marble run in three.js',
-  messages: [
-    {
-      id: 1,
-      role: 'user',
-      text: "Help me build a marble run in three.js and start by explaining how it works and giving me link to satisfy my technical curiosity"
-    },
-    {
-      id: 2,
-      role: 'assistant',
-      text: "I'll help you build a marble run in three.js! Let me start by explaining the physics and rendering architecture you'll need.\n\nFor a React-based approach, you should use %%React Three Fiber%% (R3F) to handle the 3D scene declaratively. For the physics simulation with gravity, collisions, and marble movement, we'll integrate %%Cannon.js%% which provides a robust rigid body physics engine.\n\nWe'll need a solid %%Game Loop%% that synchronizes the physics step with the render frame at 60fps. The track itself can be built using modular %%Constructive Solid Geometry%% techniques, making it easy to design complex paths procedurally."
-    }
-  ]
+  title: 'New Chat',
+  messages: []
 };
 
 // --- Main Application ---
@@ -99,16 +78,45 @@ export default function ClaudeLearningPrototype() {
   const [selectionBox, setSelectionBox] = useState(null);
   const [selectedText, setSelectedText] = useState("");
 
-  // User Profile State
-  const [userProfile, setUserProfile] = useState("I am a React developer interested in Game Development and 3D Graphics. I prefer practical examples over pure theory.");
+  // User Profile State (Background ||| Aspirations ||| Learning Goals)
+  const [userProfile, setUserProfile] = useState("I'm a professor of positive AI at Delft University of Technology. I have a background in cognitive science, art, human-centered design, and HCI.|||I want to make top-level connections in AI & experience design, particularly in education.|||I want to understand React more deeply and keep getting better and better at vibecoding.");
 
-  // Chat Data State
-  const [messages, setMessages] = useState(DEFAULT_CHAT.messages);
-  const [chatHistory, setChatHistory] = useState([
-    { id: 'chat-1', title: 'Help me build a marble run in three.js' },
-    { id: 'chat-2', title: 'Understanding Redux Middleware' },
-    { id: 'chat-3', title: 'CSS Grid Layouts' }
-  ]);
+  // Chat Data State - store messages per chat
+  const [chats, setChats] = useState({
+    'chat-1': {
+      title: 'Help me build a marble run in three.js',
+      messages: DEFAULT_CHAT.messages
+    },
+    'chat-2': {
+      title: 'Understanding Redux Middleware',
+      messages: []
+    },
+    'chat-3': {
+      title: 'CSS Grid Layouts',
+      messages: []
+    }
+  });
+  const [activeChatId, setActiveChatId] = useState('chat-1');
+
+  // Derived state for current chat
+  const messages = chats[activeChatId]?.messages || [];
+  const setMessages = (updater) => {
+    setChats(prev => ({
+      ...prev,
+      [activeChatId]: {
+        ...prev[activeChatId],
+        messages: typeof updater === 'function'
+          ? updater(prev[activeChatId]?.messages || [])
+          : updater
+      }
+    }));
+  };
+
+  // Chat history derived from chats
+  const chatHistory = Object.entries(chats).map(([id, chat]) => ({
+    id,
+    title: chat.title
+  }));
 
   // Input State
   const [inputText, setInputText] = useState("");
@@ -116,11 +124,121 @@ export default function ClaudeLearningPrototype() {
   const [isTyping, setIsTyping] = useState(false);
 
   // Tab State
-  const [tabs, setTabs] = useState([{ id: 'main', title: 'Help me build a marble run in three.js', type: 'chat', content: null }]);
+  const [tabs, setTabs] = useState([{ id: 'main', title: 'New Chat', type: 'chat', content: null }]);
   const [activeTabId, setActiveTabId] = useState('main');
 
-  // Dynamic Summaries Cache
+  // Concept cache for Deep Dive tab summaries
   const [conceptCache, setConceptCache] = useState(DEFAULT_PRELOADED_SUMMARIES);
+
+  // Handler for running artifacts - opens as a tab instead of modal
+  const handleRunArtifact = (code, language) => {
+    const artifactTabId = `artifact-${Date.now()}`;
+    const newTab = {
+      id: artifactTabId,
+      title: `${language.toUpperCase()} Preview`,
+      type: 'artifact',
+      content: {
+        code,
+        language
+      }
+    };
+    setTabs(prev => [...prev, newTab]);
+    setActiveTabId(artifactTabId);
+  };
+
+  // --- System Prompts ---
+  const getMainChatSystemPrompt = () => {
+    if (!learningModeOn) {
+      return `You are Claude, a helpful AI assistant. Respond naturally and helpfully.`;
+    }
+
+    return `You are Claude in Learning Mode - an AI tutor that adapts to the learner.
+
+LEARNER PROFILE:
+${userProfile}
+
+---
+
+RESPONSE STRUCTURE (IMPORTANT - follow this order):
+
+1. **Brief intro** (1-2 sentences) - What you're going to help with
+
+2. **Explanation with Learning Links** - Explain the concepts FIRST, before any code. Include 2-4 learning links formatted as [[concept::10-15 word definition]]. This gives the learner something to read while code generates.
+
+3. **Code artifact** (if applicable) - Put code blocks LAST, after the explanation.
+
+4. **Optional follow-up** - One specific learning invitation like "Want to understand how [mechanism] works?"
+
+---
+
+LEARNING LINKS:
+Format: [[concept::50-100 word explanation]]
+
+The explanation should be substantial - enough to satisfy initial curiosity. It will display as the opening text when the user clicks to explore the concept.
+
+Examples:
+- [[useState::A React hook that lets functional components maintain state between renders. When you call useState, you get back an array with the current value and a setter function. Each time the setter is called, React re-renders the component with the new value. This is how components "remember" things like form inputs, toggle states, or counters without losing data between renders.]]
+- [[Tailwind CSS::A utility-first CSS framework that provides pre-built classes like flex, pt-4, and text-center instead of writing custom CSS. Rather than naming things like .card-container, you compose styles directly in your HTML. This approach speeds up development and keeps styles consistent, though it can make markup look busy at first.]]
+
+Choose 2-4 terms that match the learner's goals and may be unfamiliar.
+
+---
+
+REACT ARTIFACTS:
+Requirements:
+- Use \`\`\`jsx code blocks with complete components
+- Always include: \`export default function ComponentName()\`
+- Explicit hook imports: \`import { useState, useEffect } from 'react'\`
+- Use Tailwind CSS for all styling
+
+Available libraries:
+- lucide-react: \`import { Icon } from 'lucide-react'\`
+- recharts: \`import { LineChart, BarChart, ... } from 'recharts'\`
+- framer-motion: \`import { motion } from 'framer-motion'\`
+- date-fns, lodash, mathjs also available
+
+Constraints:
+- NO localStorage/sessionStorage
+- NO external API calls
+- NO require() - use ES6 imports
+
+Design: Modern aesthetics with gradients, shadows, animations, hover effects.`;
+  };
+
+  const getDeepDiveSystemPrompt = (term) => {
+    return `You are Claude explaining a concept in a focused Deep Dive sidebar.
+
+LEARNER PROFILE:
+${userProfile}
+
+CONCEPT TO EXPLAIN: "${term}"
+
+YOUR TASK:
+1. Explain "${term}" clearly and concisely (2-3 paragraphs max)
+2. Adapt your explanation to match the learner's background and interests
+3. Include 2-3 learning links for related concepts: [[term::brief definition]]
+4. Use code examples if they help clarify (use proper fenced code blocks)
+5. End with: RELATED: Term 1, Term 2, Term 3 (suggest 2-3 related concepts to explore next)
+
+Keep it focused - this is a sidebar exploration, not a full lesson.`;
+  };
+
+  const getSideChatSystemPrompt = (topic) => {
+    return `You are Claude in a focused side conversation about "${topic}".
+
+LEARNER PROFILE:
+${userProfile}
+
+CONTEXT: The learner opened a Deep Dive tab about "${topic}" and is asking follow-up questions.
+
+YOUR BEHAVIOR:
+1. Keep answers focused on "${topic}" and closely related concepts
+2. Use [[learning links::with brief definitions]] for terms worth exploring
+3. Provide code examples when helpful (use fenced code blocks)
+4. Be concise - this is a side conversation, not the main chat
+5. Connect explanations to the learner's interests when possible`;
+  };
+
 
   // --- Keyboard Shortcuts Hook ---
   useEffect(() => {
@@ -193,49 +311,56 @@ export default function ClaudeLearningPrototype() {
     return () => document.removeEventListener('mouseup', handleSelection);
   }, []);
 
-  // --- API: Fetch Definition (Deep Dive) ---
-  const fetchConceptData = async (term) => {
+  // --- API: Fetch Definition (Deep Dive) with Streaming ---
+  const fetchConceptDataStreaming = async (term, tabId) => {
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          system: getDeepDiveSystemPrompt(term),
           messages: [{
             role: 'user',
-            content: `You are explaining a technical concept in a side-bar.
-Concept: "${term}"
-User Profile: "${userProfile}"
-
-CRITICAL INSTRUCTION:
-Explain this concept clearly and concisely (2-3 paragraphs max).
-Wrap 2-3 key related technical terms in your explanation with %%double percentage signs%% (e.g., %%WebGL%%) so they can be interactive.
-
-At the end, list 2-3 related terms the user might want to explore next.
-
-Format your response like this:
-[Your explanation with %%highlighted terms%%]
-
-RELATED: Term 1, Term 2, Term 3`
-          }],
-          model: 'claude-opus-4-20250514'
+            content: `Explain "${term}" to me.`
+          }]
         }),
       });
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let fullText = '';
+      let buffer = '';
+
+      // Mark as no longer loading, start streaming
+      setTabs(prev => prev.map(t => {
+        if (t.id === tabId) {
+          return {
+            ...t,
+            loading: false,
+            content: {
+              ...t.content,
+              messages: [{ id: 'init', role: 'ai', text: '' }]
+            }
+          };
+        }
+        return t;
+      }));
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+
+        // Process complete SSE messages from buffer
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
-            if (data === '[DONE]') break;
+            if (data === '[DONE]') continue;
 
             try {
               const parsed = JSON.parse(data);
@@ -243,13 +368,29 @@ RELATED: Term 1, Term 2, Term 3`
                 fullText += parsed.text;
               }
             } catch (parseError) {
-              // Ignore
+              // Ignore parse errors
             }
           }
         }
+
+        // Update after each chunk read (not each SSE line) for smoother streaming
+        if (fullText) {
+          setTabs(prev => prev.map(t => {
+            if (t.id === tabId) {
+              return {
+                ...t,
+                content: {
+                  ...t.content,
+                  messages: [{ id: 'init', role: 'ai', text: fullText }]
+                }
+              };
+            }
+            return t;
+          }));
+        }
       }
 
-      // Parse RELATED section
+      // Parse RELATED section after streaming completes
       const relatedMatch = fullText.match(/RELATED:\s*(.+)$/i);
       const related = relatedMatch
         ? relatedMatch[1].split(',').map(t => t.trim()).filter(t => t)
@@ -259,13 +400,36 @@ RELATED: Term 1, Term 2, Term 3`
         ? fullText.substring(0, relatedMatch.index).trim()
         : fullText;
 
-      return { explanation, related };
+      // Final update with related terms
+      setTabs(prev => prev.map(t => {
+        if (t.id === tabId) {
+          return {
+            ...t,
+            content: {
+              ...t.content,
+              messages: [{ id: 'init', role: 'ai', text: explanation }],
+              related: related
+            }
+          };
+        }
+        return t;
+      }));
+
     } catch (error) {
       console.error("Claude API Error:", error);
-      return {
-        explanation: "We encountered an error connecting to Claude.",
-        related: []
-      };
+      setTabs(prev => prev.map(t => {
+        if (t.id === tabId) {
+          return {
+            ...t,
+            loading: false,
+            content: {
+              ...t.content,
+              messages: [{ id: 'init', role: 'ai', text: 'We encountered an error connecting to Claude.' }]
+            }
+          };
+        }
+        return t;
+      }));
     }
   };
 
@@ -287,11 +451,11 @@ RELATED: Term 1, Term 2, Term 3`
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          system: getMainChatSystemPrompt(),
           messages: messages.map(m => ({
             role: m.role === 'ai' ? 'assistant' : m.role,
             content: m.text
-          })).concat([{ role: 'user', content: inputText }]),
-          model: 'claude-opus-4-20250514'
+          })).concat([{ role: 'user', content: inputText }])
         }),
       });
 
@@ -301,7 +465,7 @@ RELATED: Term 1, Term 2, Term 3`
       let aiMsgId = Date.now() + 1;
 
       // Add placeholder message
-      setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', text: '' }]);
+      setMessages(prev => [...prev, { id: aiMsgId, role: 'assistant', text: '' }]);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -325,19 +489,22 @@ RELATED: Term 1, Term 2, Term 3`
                   m.id === aiMsgId ? { ...m, text: fullText } : m
                 ));
               }
-            } catch (parseError) {
-              // Ignore
+            } catch {
+              // Ignore parse errors
             }
           }
         }
       }
 
-      // Update tab title if new chat
+      // Update chat and tab title if new chat
       if (isNewChat && fullText) {
         const firstLine = inputText.split('\n')[0];
         const newTitle = firstLine.slice(0, 50) + (firstLine.length > 50 ? '...' : '');
         setTabs(prev => prev.map(t => t.id === 'main' ? { ...t, title: newTitle } : t));
-        setChatHistory(prev => [{ id: `chat-${Date.now()}`, title: newTitle }, ...prev]);
+        setChats(prev => ({
+          ...prev,
+          [activeChatId]: { ...prev[activeChatId], title: newTitle }
+        }));
       }
 
     } catch (error) {
@@ -375,11 +542,11 @@ RELATED: Term 1, Term 2, Term 3`
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          system: getSideChatSystemPrompt(currentTab.title),
           messages: currentTab.content.messages.map(m => ({
             role: m.role === 'ai' ? 'assistant' : m.role,
             content: m.text
-          })).concat([{ role: 'user', content: sideInputText }]),
-          model: 'claude-opus-4-20250514'
+          })).concat([{ role: 'user', content: sideInputText }])
         }),
       });
 
@@ -395,7 +562,7 @@ RELATED: Term 1, Term 2, Term 3`
             ...t,
             content: {
               ...t.content,
-              messages: [...t.content.messages, { id: aiMsgId, role: 'ai', text: '' }]
+              messages: [...t.content.messages, { id: aiMsgId, role: 'assistant', text: '' }]
             }
           };
         }
@@ -447,7 +614,8 @@ RELATED: Term 1, Term 2, Term 3`
   };
 
   // --- Handlers ---
-  const handleOpenTab = async (term) => {
+  // handleOpenTab accepts optional definition from [[term::definition]] links
+  const handleOpenTab = async (term, definition = null) => {
     setSearchModalOpen(false);
     setSelectionBox(null);
     window.getSelection()?.removeAllRanges();
@@ -458,7 +626,8 @@ RELATED: Term 1, Term 2, Term 3`
       return;
     }
 
-    const preloadSummary = conceptCache[term] || `Exploring ${term}...`;
+    // Use inline definition if provided, otherwise fall back to cache or placeholder
+    const preloadSummary = definition || conceptCache[term] || `Exploring ${term}...`;
 
     const newTabId = `tab-${Date.now()}`;
     const newTab = {
@@ -476,26 +645,17 @@ RELATED: Term 1, Term 2, Term 3`
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(newTabId);
 
-    const data = await fetchConceptData(term);
-
-    setTabs(prev => prev.map(t => {
-      if (t.id === newTabId) {
-        return {
-          ...t,
-          loading: false,
-          content: {
-            ...t.content,
-            messages: [{ id: 'init', role: 'ai', text: data.explanation }],
-            related: data.related
-          }
-        };
-      }
-      return t;
-    }));
+    // Start streaming (non-blocking)
+    fetchConceptDataStreaming(term, newTabId);
   };
 
   const handleNewChat = () => {
-    setMessages([]);
+    const newChatId = `chat-${Date.now()}`;
+    setChats(prev => ({
+      ...prev,
+      [newChatId]: { title: 'New Chat', messages: [] }
+    }));
+    setActiveChatId(newChatId);
     setTabs([{ id: 'main', title: 'New Chat', type: 'chat', content: null }]);
     setActiveTabId('main');
     setSidebarOpen(false);
@@ -519,29 +679,54 @@ RELATED: Term 1, Term 2, Term 3`
       return (
         <div className="flex-1 overflow-y-auto px-4 py-6 scroll-smooth relative">
           {messages.length === 0 && (
-             <div className="flex flex-col items-center justify-center h-[50vh] text-center text-gray-400">
-                <Sparkles size={48} className="mb-4 opacity-20" />
-                <p>Start a new conversation</p>
-                <p className="text-xs mt-2 opacity-50 max-w-xs">{userProfile}</p>
-                <div className="mt-8 flex items-center gap-4 text-xs bg-gray-100 p-3 rounded-lg opacity-60">
-                    <Keyboard size={16} />
-                    <div className="flex gap-4">
-                        <span className="flex items-center gap-1"><span className="font-bold">Opt</span>+<span className="font-bold">←/→</span> Nav</span>
-                        <span className="flex items-center gap-1"><span className="font-bold">Opt</span>+<span className="font-bold">↑</span> New Tab</span>
-                    </div>
-                </div>
+             <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+                <h1 className="text-4xl md:text-5xl font-serif text-[#2D2D2A] mb-3">
+                  {(() => {
+                    const hour = new Date().getHours();
+                    if (hour < 12) return 'Good morning';
+                    if (hour < 17) return 'Good afternoon';
+                    return 'Good evening';
+                  })()}, Derek
+                </h1>
+                {learningModeOn && (
+                  <div className="flex items-center gap-2 text-[#D97757] text-sm font-medium mt-2">
+                    <Sparkles size={16} />
+                    <span>Learning Mode Active</span>
+                  </div>
+                )}
              </div>
           )}
-          {messages.map((msg) => (
-             <div key={msg.id} className={`mb-8 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-               <div className={`max-w-[90%] md:max-w-[80%] rounded-2xl p-4 md:p-6 shadow-sm ${
-                 msg.role === 'user' ? 'bg-[#EFECE6] text-[#424240]' : 'bg-white text-[#141413] border border-[#E6E4DD]'
-               }`}>
-                 <ContentWithChips
-                    text={msg.text}
-                    onChipClick={handleOpenTab}
-                    isSerif={msg.role === 'ai'}
-                 />
+          {messages.map((msg, idx) => (
+             <div key={msg.id} className={`mb-6 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+               <div className="max-w-[90%] md:max-w-[80%]">
+                 <div className={`rounded-2xl p-4 md:p-6 shadow-sm ${
+                   msg.role === 'user' ? 'bg-[#EFECE6] text-[#424240]' : 'bg-white text-[#141413] border border-[#E6E4DD]'
+                 }`}>
+                   <MarkdownRenderer
+                      content={msg.text}
+                      onChipClick={handleOpenTab}
+                      onRunArtifact={handleRunArtifact}
+                      isSerif={msg.role === 'assistant' || msg.role === 'ai'}
+                   />
+                 </div>
+                 {/* Message actions for AI responses */}
+                 {(msg.role === 'assistant' || msg.role === 'ai') && msg.text && (
+                   <div className="flex items-center gap-1 mt-2 ml-1">
+                     <button className="p-1.5 hover:bg-[#EFECE6] rounded-lg transition-colors text-[#9B9B9B] hover:text-[#6B6B6B]" title="Copy">
+                       <Copy size={16} />
+                     </button>
+                     <button className="p-1.5 hover:bg-[#EFECE6] rounded-lg transition-colors text-[#9B9B9B] hover:text-[#6B6B6B]" title="Good response">
+                       <ThumbsUp size={16} />
+                     </button>
+                     <button className="p-1.5 hover:bg-[#EFECE6] rounded-lg transition-colors text-[#9B9B9B] hover:text-[#6B6B6B]" title="Bad response">
+                       <ThumbsDown size={16} />
+                     </button>
+                     <button className="p-1.5 hover:bg-[#EFECE6] rounded-lg transition-colors text-[#9B9B9B] hover:text-[#6B6B6B] flex items-center gap-1" title="Retry">
+                       <RotateCcw size={16} />
+                       <span className="text-xs">Retry</span>
+                     </button>
+                   </div>
+                 )}
                </div>
              </div>
           ))}
@@ -558,6 +743,21 @@ RELATED: Term 1, Term 2, Term 3`
       );
     }
 
+    // Artifact tab - full-screen code preview
+    if (activeTab.type === 'artifact') {
+      return (
+        <div className="flex-1 flex flex-col bg-white">
+          <ArtifactPreview
+            code={activeTab.content.code}
+            language={activeTab.content.language}
+            title={activeTab.title}
+            onClose={() => closeTab(null, activeTab.id)}
+          />
+        </div>
+      );
+    }
+
+    // Learning/Deep Dive tab
     return (
       <div className="flex-1 flex flex-col bg-white animate-in slide-in-from-right-10 duration-300">
         <div className="p-6 md:p-8 pb-4 border-b border-gray-100">
@@ -593,7 +793,12 @@ RELATED: Term 1, Term 2, Term 3`
                                          <Sparkles size={12} /> <span className="text-xs uppercase font-sans tracking-widest">Answer</span>
                                      </div>
                                 )}
-                                <ContentWithChips text={msg.text} onChipClick={handleOpenTab} isSerif={msg.role === 'ai'} />
+                                <MarkdownRenderer
+                                  content={msg.text}
+                                  onChipClick={handleOpenTab}
+                                  onRunArtifact={handleRunArtifact}
+                                  isSerif={msg.role === 'ai'}
+                                />
                              </div>
                         </div>
                     ))}
@@ -700,32 +905,110 @@ RELATED: Term 1, Term 2, Term 3`
         </div>
       )}
 
-      {/* Settings Modal */}
+      {/* Learning Profile Modal */}
       {settingsOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSettingsOpen(false)} />
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="p-6 border-b border-[#E6E4DD] flex justify-between items-center bg-[#FAF9F6]">
-                    <h3 className="font-serif text-xl font-bold text-[#141413]">Learning Profile</h3>
-                    <button onClick={() => setSettingsOpen(false)} className="p-1 hover:bg-gray-200 rounded-full transition-colors">
-                        <X size={20} className="text-gray-500" />
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg relative z-10 overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+                {/* Header */}
+                <div className="p-6 border-b border-[#E6E4DD] bg-[#FAF9F6]">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="flex items-center gap-2 text-[#D97757] mb-1">
+                                <GraduationCap size={20} />
+                                <span className="text-sm font-medium uppercase tracking-wide">Learning Mode</span>
+                            </div>
+                            <h3 className="font-serif text-2xl font-bold text-[#141413]">Your Learning Profile</h3>
+                        </div>
+                        <button onClick={() => setSettingsOpen(false)} className="p-1.5 hover:bg-[#EFECE6] rounded-lg transition-colors">
+                            <X size={20} className="text-[#6B6B6B]" />
+                        </button>
+                    </div>
+                    <p className="text-sm text-[#6B6B6B] mt-2">
+                        Help Claude understand your background so it can personalize explanations and highlight relevant concepts for you.
+                    </p>
+                </div>
+
+                {/* Toggle */}
+                <div className="px-6 py-4 border-b border-[#E6E4DD] flex items-center justify-between">
+                    <div>
+                        <div className="font-medium text-[#2D2D2A]">Enable Learning Mode</div>
+                        <div className="text-sm text-[#6B6B6B]">Highlight concepts and adapt explanations</div>
+                    </div>
+                    <button
+                        onClick={() => setLearningModeOn(!learningModeOn)}
+                        className={`relative w-12 h-7 rounded-full transition-colors ${
+                            learningModeOn ? 'bg-[#D97757]' : 'bg-[#E6E4DD]'
+                        }`}
+                    >
+                        <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                            learningModeOn ? 'translate-x-6' : 'translate-x-1'
+                        }`} />
                     </button>
                 </div>
-                <div className="p-6">
-                    <p className="text-sm text-gray-500 mb-4">
-                        Claude adapts its explanations and highlights based on your interests.
-                    </p>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">My Interests</label>
-                    <textarea
-                        value={userProfile}
-                        onChange={(e) => setUserProfile(e.target.value)}
-                        className="w-full h-32 p-3 rounded-lg border border-[#E6E4DD] bg-[#FAF9F6] text-[#2D2D2A] focus:outline-none focus:ring-2 focus:ring-[#D97757] resize-none"
-                    />
+
+                {/* Form */}
+                <div className="p-6 space-y-5">
+                    {/* Background */}
+                    <div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-[#2D2D2A] mb-2">
+                            <User size={16} className="text-[#D97757]" />
+                            Your Background
+                        </label>
+                        <textarea
+                            placeholder="e.g., I'm a frontend developer with 3 years of experience. I know React and TypeScript well, but I'm new to 3D graphics..."
+                            value={userProfile.split('|||')[0] || ''}
+                            onChange={(e) => {
+                                const parts = userProfile.split('|||');
+                                setUserProfile([e.target.value, parts[1] || '', parts[2] || ''].join('|||'));
+                            }}
+                            className="w-full h-24 p-3 rounded-lg border border-[#E6E4DD] bg-[#FAF9F6] text-[#2D2D2A] placeholder:text-[#9B9B9B] focus:outline-none focus:ring-2 focus:ring-[#D97757] resize-none text-sm"
+                        />
+                    </div>
+
+                    {/* Aspirations */}
+                    <div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-[#2D2D2A] mb-2">
+                            <Lightbulb size={16} className="text-[#D97757]" />
+                            Aspirations
+                        </label>
+                        <textarea
+                            placeholder="e.g., I want to build my own indie games, create interactive art installations, or work at a game studio..."
+                            value={userProfile.split('|||')[1] || ''}
+                            onChange={(e) => {
+                                const parts = userProfile.split('|||');
+                                setUserProfile([parts[0] || '', e.target.value, parts[2] || ''].join('|||'));
+                            }}
+                            className="w-full h-24 p-3 rounded-lg border border-[#E6E4DD] bg-[#FAF9F6] text-[#2D2D2A] placeholder:text-[#9B9B9B] focus:outline-none focus:ring-2 focus:ring-[#D97757] resize-none text-sm"
+                        />
+                    </div>
+
+                    {/* Learning Goals */}
+                    <div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-[#2D2D2A] mb-2">
+                            <Target size={16} className="text-[#D97757]" />
+                            Learning Goals
+                        </label>
+                        <textarea
+                            placeholder="e.g., I want to understand game physics, learn Three.js, and build interactive 3D experiences..."
+                            value={userProfile.split('|||')[2] || ''}
+                            onChange={(e) => {
+                                const parts = userProfile.split('|||');
+                                setUserProfile([parts[0] || '', parts[1] || '', e.target.value].join('|||'));
+                            }}
+                            className="w-full h-24 p-3 rounded-lg border border-[#E6E4DD] bg-[#FAF9F6] text-[#2D2D2A] placeholder:text-[#9B9B9B] focus:outline-none focus:ring-2 focus:ring-[#D97757] resize-none text-sm"
+                        />
+                    </div>
                 </div>
-                <div className="p-4 border-t border-[#E6E4DD] flex justify-end">
+
+                {/* Footer */}
+                <div className="p-4 border-t border-[#E6E4DD] bg-[#FAF9F6] flex justify-between items-center">
+                    <p className="text-xs text-[#9B9B9B]">
+                        Your profile is stored locally and used to personalize Claude's responses.
+                    </p>
                     <button
                         onClick={() => setSettingsOpen(false)}
-                        className="flex items-center gap-2 px-6 py-2 bg-[#D97757] hover:bg-[#C06345] text-white rounded-lg font-medium transition-colors"
+                        className="flex items-center gap-2 px-5 py-2 bg-[#D97757] hover:bg-[#C06345] text-white rounded-lg font-medium transition-colors text-sm"
                     >
                         <Save size={16} />
                         Save Profile
@@ -735,87 +1018,224 @@ RELATED: Term 1, Term 2, Term 3`
         </div>
       )}
 
-      {/* Sidebar Overlay */}
+      {/* Collapsed Icon Sidebar - Claude Style */}
+      <aside className="w-[52px] bg-[#FAF9F6] border-r border-[#E6E4DD] flex flex-col items-center py-3 shrink-0">
+        {/* Collapse/Expand Toggle */}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="w-9 h-9 rounded-lg hover:bg-[#EFECE6] flex items-center justify-center text-[#6B6B6B] transition-colors mb-2"
+          title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+        >
+          {sidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeft size={20} />}
+        </button>
+
+        {/* New Chat Button */}
+        <button
+          onClick={handleNewChat}
+          className="w-9 h-9 rounded-lg bg-[#D97757] hover:bg-[#C06345] flex items-center justify-center text-white transition-colors mb-3"
+          title="New Chat"
+        >
+          <Plus size={20} />
+        </button>
+
+        {/* Icon Navigation */}
+        <div className="flex flex-col items-center gap-1">
+          <button
+            className="w-9 h-9 rounded-lg hover:bg-[#EFECE6] flex items-center justify-center text-[#6B6B6B] transition-colors"
+            title="Search"
+          >
+            <Search size={20} />
+          </button>
+          <button
+            className="w-9 h-9 rounded-lg hover:bg-[#EFECE6] flex items-center justify-center text-[#6B6B6B] transition-colors"
+            title="History"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+          >
+            <History size={20} />
+          </button>
+          <button
+            className="w-9 h-9 rounded-lg hover:bg-[#EFECE6] flex items-center justify-center text-[#6B6B6B] transition-colors"
+            title="Projects"
+          >
+            <FolderOpen size={20} />
+          </button>
+          <button
+            className="w-9 h-9 rounded-lg hover:bg-[#EFECE6] flex items-center justify-center text-[#6B6B6B] transition-colors"
+            title="Integrations"
+          >
+            <Blocks size={20} />
+          </button>
+          <button
+            className="w-9 h-9 rounded-lg hover:bg-[#EFECE6] flex items-center justify-center text-[#6B6B6B] transition-colors"
+            title="Code"
+          >
+            <Code size={20} />
+          </button>
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
+              learningModeOn
+                ? 'bg-orange-50 text-[#D97757]'
+                : 'hover:bg-[#EFECE6] text-[#6B6B6B]'
+            }`}
+            title="Learning Mode"
+          >
+            <GraduationCap size={20} />
+          </button>
+        </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* User Avatar */}
+        <button
+          onClick={() => setSettingsOpen(true)}
+          className="w-9 h-9 rounded-full bg-[#3D3D3D] flex items-center justify-center text-white text-xs font-medium hover:ring-2 hover:ring-[#D97757] transition-all"
+          title="Settings"
+        >
+          DL
+        </button>
+      </aside>
+
+      {/* Expanded Sidebar Panel (overlay) */}
       {sidebarOpen && (
+        <>
           <div
-            className="fixed inset-0 bg-black/20 z-40 md:hidden"
+            className="fixed inset-0 bg-black/20 z-40"
             onClick={() => setSidebarOpen(false)}
           />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={`
-            fixed md:relative inset-y-0 left-0 z-50 w-72 bg-[#F2F0EB] border-r border-[#E6E4DD] transform transition-transform duration-300 ease-in-out
-            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0 md:w-0 md:border-none md:overflow-hidden'}
-        `}
-      >
-        <div className="flex flex-col h-full p-4 w-72">
-            <div className="flex justify-between items-center mb-6">
-                <span className="font-serif text-lg font-bold text-[#141413]">Recents</span>
-                <button onClick={() => setSidebarOpen(false)} className="md:hidden p-2 hover:bg-gray-200 rounded-md">
-                    <X size={18} />
-                </button>
+          <aside className="fixed left-[52px] top-0 bottom-0 w-72 bg-[#FAF9F6] border-r border-[#E6E4DD] z-50 shadow-xl overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex justify-between items-center p-4 border-b border-[#E6E4DD]">
+              <span className="font-serif text-xl font-bold text-[#141413]">Claude</span>
+              <button onClick={() => setSidebarOpen(false)} className="p-1.5 hover:bg-[#EFECE6] rounded-md">
+                <PanelLeftClose size={18} className="text-[#6B6B6B]" />
+              </button>
             </div>
 
-            <button
+            {/* Navigation */}
+            <div className="p-3 space-y-1">
+              <button
                 onClick={handleNewChat}
-                className="flex items-center gap-3 w-full bg-[#D97757] hover:bg-[#C06345] text-white p-3 rounded-lg mb-6 transition-colors shadow-sm"
-            >
+                className="flex items-center gap-3 w-full px-3 py-2 rounded-lg bg-[#D97757] hover:bg-[#C06345] text-white transition-colors"
+              >
                 <Plus size={18} />
-                <span className="font-medium">New Chat</span>
-            </button>
+                <span className="font-medium">New chat</span>
+              </button>
 
-            <div className="flex-1 overflow-y-auto space-y-2">
-                <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 mt-4">Today</div>
-                {chatHistory.map(chat => (
-                    <button
-                        key={chat.id}
-                        onClick={() => {
-                            setSidebarOpen(false);
-                            setActiveTabId('main');
-                        }}
-                        className="w-full text-left p-3 rounded-lg hover:bg-white transition-colors text-sm text-[#424240] truncate"
-                    >
-                        <span className="block truncate">{chat.title}</span>
-                    </button>
+              <button className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-[#EFECE6] text-[#424240] transition-colors">
+                <MessageCircle size={18} />
+                <span>Chats</span>
+              </button>
+
+              <button className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-[#EFECE6] text-[#424240] transition-colors">
+                <FolderOpen size={18} />
+                <span>Projects</span>
+              </button>
+
+              <button className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-[#EFECE6] text-[#424240] transition-colors">
+                <Blocks size={18} />
+                <span>Artifacts</span>
+              </button>
+
+              <button className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-[#EFECE6] text-[#424240] transition-colors">
+                <Code size={18} />
+                <span>Code</span>
+              </button>
+
+              <button
+                onClick={() => { setSidebarOpen(false); setSettingsOpen(true); }}
+                className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg transition-colors ${
+                  learningModeOn
+                    ? 'bg-orange-50 text-[#D97757]'
+                    : 'hover:bg-[#EFECE6] text-[#424240]'
+                }`}
+              >
+                <GraduationCap size={18} />
+                <span>Learning Mode</span>
+                {learningModeOn && <span className="ml-auto text-xs bg-[#D97757] text-white px-1.5 py-0.5 rounded">ON</span>}
+              </button>
+            </div>
+
+            {/* Starred section */}
+            <div className="px-3 py-2">
+              <div className="flex items-center gap-2 text-xs font-medium text-[#9B9B9B] uppercase tracking-wider mb-2">
+                <Star size={12} />
+                Starred
+              </div>
+              <div className="space-y-1">
+                {chatHistory.filter((_, i) => i < 3).map(chat => (
+                  <button
+                    key={`starred-${chat.id}`}
+                    onClick={() => {
+                      setActiveChatId(chat.id);
+                      setActiveTabId('main');
+                      setTabs(prev => prev.map(t => t.id === 'main' ? { ...t, title: chat.title } : t));
+                      setSidebarOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#EFECE6] text-sm text-[#424240] truncate"
+                  >
+                    {chat.title}
+                  </button>
                 ))}
+              </div>
             </div>
 
-            <div className="mt-auto pt-4 border-t border-gray-300">
-                <button
-                    onClick={() => setSettingsOpen(true)}
-                    className="flex items-center gap-2 w-full p-2 text-sm text-[#424240] hover:bg-white rounded-lg transition-colors"
-                >
-                      <Settings size={18} />
-                      <span>Learning Profile</span>
-                </button>
-                <div className="mt-2 flex items-center gap-2 p-2">
-                    <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-white font-serif">
-                        DL
-                    </div>
-                    <div className="flex-1">
-                        <div className="font-medium text-[#141413]">Derek Lomas</div>
-                        <div className="text-xs text-gray-500">Max Plan</div>
-                    </div>
-                </div>
+            {/* Recents section */}
+            <div className="flex-1 overflow-y-auto px-3 py-2">
+              <div className="text-xs font-medium text-[#9B9B9B] uppercase tracking-wider mb-2">Recents</div>
+              <div className="space-y-1">
+                {chatHistory.map(chat => (
+                  <button
+                    key={chat.id}
+                    onClick={() => {
+                      setActiveChatId(chat.id);
+                      setActiveTabId('main');
+                      setTabs(prev => prev.map(t => t.id === 'main' ? { ...t, title: chat.title } : t));
+                      setSidebarOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors text-sm truncate ${
+                      activeChatId === chat.id
+                        ? 'bg-[#EFECE6] text-[#2D2D2A] font-medium'
+                        : 'text-[#424240] hover:bg-[#EFECE6]'
+                    }`}
+                  >
+                    {chat.title}
+                  </button>
+                ))}
+              </div>
             </div>
-        </div>
-      </aside>
+
+            {/* User section */}
+            <div className="p-3 border-t border-[#E6E4DD]">
+              <button className="flex items-center gap-3 w-full px-2 py-2 rounded-lg hover:bg-[#EFECE6] transition-colors">
+                <div className="w-8 h-8 rounded-full bg-[#3D3D3D] flex items-center justify-center text-white text-xs font-medium">
+                  DL
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="text-sm font-medium text-[#2D2D2A]">Derek Lomas</div>
+                  <div className="text-xs text-[#9B9B9B]">Max plan</div>
+                </div>
+                <ChevronUp size={16} className="text-[#9B9B9B]" />
+              </button>
+            </div>
+          </aside>
+        </>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative transition-all duration-300">
-          <header className="h-14 flex items-center justify-between px-4 border-b border-[#E6E4DD] bg-[#FAF9F6] shrink-0 z-10">
-                <div
-                    onClick={() => setSidebarOpen(!sidebarOpen)}
-                    className="p-2 hover:bg-[#EFECE6] rounded-md cursor-pointer shrink-0 transition-colors"
-                >
-                    <Menu size={20} className="text-[#424240]" />
+          {/* Header with conversation title */}
+          <header className="h-12 flex items-center justify-between px-4 bg-[#FAF9F6] shrink-0 z-10">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-[#2D2D2A]">
+                    {tabs.find(t => t.id === activeTabId)?.title || 'New Chat'}
+                  </span>
+                  <ChevronDown size={16} className="text-[#6B6B6B]" />
                 </div>
-                <div className="text-sm font-medium text-gray-400 flex items-center gap-2">
-                    <span className="hidden md:inline">Claude Tabs</span>
-                </div>
-                <div className="w-8"></div>
+                <button className="px-3 py-1.5 text-sm font-medium text-[#2D2D2A] hover:bg-[#EFECE6] rounded-lg transition-colors">
+                  Share
+                </button>
           </header>
 
           <main className="flex-1 flex overflow-hidden relative bg-[#FAF9F6]">
@@ -824,81 +1244,114 @@ RELATED: Term 1, Term 2, Term 3`
 
           {/* Input Area (Main Chat Only) */}
           {activeTabId === 'main' && (
-            <div className="p-4 bg-gradient-to-t from-[#FAF9F6] via-[#FAF9F6] to-[#FAF9F6]/0 z-20 shrink-0">
-                <div className="max-w-3xl mx-auto bg-white rounded-2xl border border-[#D1D1D1] shadow-lg flex items-center p-2 gap-2 focus-within:ring-2 focus-within:ring-[#D97757]/20 transition-all">
-                    <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-                        <Layers size={20} />
-                    </button>
-
+            <div className="px-4 pb-4 pt-2 bg-[#FAF9F6] z-20 shrink-0">
+                {/* Input Box */}
+                <div className="max-w-3xl mx-auto bg-white rounded-2xl border border-[#E6E4DD] shadow-sm">
                     <input
                         type="text"
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                        placeholder="Message Claude..."
-                        className="flex-1 bg-transparent border-none outline-none text-[#141413] px-2 font-sans placeholder:text-gray-400"
+                        placeholder="How can I help you today?"
+                        className="w-full bg-transparent border-none outline-none text-[#141413] px-4 py-3 font-sans placeholder:text-[#9B9B9B] text-base"
                     />
-
-                    <button
-                        onClick={() => setLearningModeOn(!learningModeOn)}
-                        className={`
-                            hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all
-                            ${learningModeOn
-                                ? 'bg-orange-100 text-[#D97757] hover:bg-orange-200'
-                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                            }
-                        `}
-                    >
-                        <Sparkles size={12} fill={learningModeOn ? "currentColor" : "none"}/>
-                        {learningModeOn ? "Learn" : "Off"}
-                    </button>
-
-                    <button
-                        onClick={handleSendMessage}
-                        disabled={!inputText.trim()}
-                        className={`p-2 rounded-xl transition-colors ${inputText.trim() ? 'bg-[#D97757] text-white hover:bg-[#C06345]' : 'bg-gray-200 text-gray-400'}`}
-                    >
-                        <ArrowRight size={18} />
-                    </button>
+                    <div className="flex items-center justify-between px-3 pb-3">
+                        <div className="flex items-center gap-1">
+                            <button className="p-2 hover:bg-[#EFECE6] rounded-lg transition-colors text-[#6B6B6B]" title="Attach file">
+                                <Plus size={20} />
+                            </button>
+                            <button className="p-2 hover:bg-[#EFECE6] rounded-lg transition-colors text-[#6B6B6B]" title="Settings">
+                                <Sliders size={20} />
+                            </button>
+                            <button
+                                onClick={() => setLearningModeOn(!learningModeOn)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium ${
+                                  learningModeOn
+                                    ? 'text-[#D97757] bg-orange-50 hover:bg-orange-100'
+                                    : 'text-[#6B6B6B] hover:bg-[#EFECE6]'
+                                }`}
+                                title="Toggle Learning Mode"
+                            >
+                                <Sparkles size={16} />
+                                <span className="hidden sm:inline">Learning Mode</span>
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button className="flex items-center gap-1 px-2 py-1 text-sm text-[#6B6B6B] hover:bg-[#EFECE6] rounded-lg transition-colors">
+                                <span>Sonnet 4</span>
+                                <ChevronDown size={14} />
+                            </button>
+                            <button
+                                onClick={handleSendMessage}
+                                disabled={!inputText.trim()}
+                                className={`p-2 rounded-xl transition-colors ${inputText.trim() ? 'bg-[#D97757] text-white hover:bg-[#C06345]' : 'bg-[#EAE8E3] text-[#B5B3AD]'}`}
+                            >
+                                <ArrowUp size={18} />
+                            </button>
+                        </div>
+                    </div>
                 </div>
+
+                {/* Disclaimer */}
+                <p className="text-center text-xs text-[#9B9B9B] mt-3">
+                    Claude can make mistakes. Please double-check responses.
+                </p>
             </div>
           )}
 
-          {/* Bottom Tab Bar */}
-          <nav className="h-[65px] bg-[#FFFFFF] border-t border-[#E6E4DD] flex items-center px-4 gap-4 overflow-x-auto shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.02)] z-30 no-scrollbar relative">
-            <div className="absolute right-0 top-[-30px] pr-4 hidden md:flex gap-3 text-[10px] text-gray-400 font-medium uppercase tracking-wider pointer-events-none">
-                <span className="bg-white/50 px-1 rounded">Opt + ←/→ Nav</span>
-                <span className="bg-white/50 px-1 rounded">Opt + ↑ New Tab</span>
-            </div>
+          {/* Bottom Tab Bar - Only shows when multiple tabs exist */}
+          {tabs.length > 1 && (
+            <nav className="h-[56px] bg-[#FFFFFF] border-t border-[#E6E4DD] flex items-center px-4 gap-3 overflow-x-auto shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.02)] z-30 no-scrollbar">
+              {/* New Tab Button */}
+              <button
+                onClick={() => setSearchModalOpen(true)}
+                className="w-9 h-9 rounded-full bg-[#F2F0EB] hover:bg-[#E6E4DD] flex items-center justify-center text-[#6B6B6B] transition-colors shrink-0"
+                title="New Learning Tab (Opt+↑)"
+              >
+                <Plus size={18} />
+              </button>
 
-            {tabs.map((tab) => (
-            <button
-                key={tab.id}
-                onClick={() => setActiveTabId(tab.id)}
-                className={`
-                flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 shrink-0
-                ${activeTabId === tab.id
-                    ? 'bg-[#1C1C1A] text-white shadow-md transform scale-105'
-                    : 'bg-[#F2F0EB] text-[#5C5C5A] hover:bg-[#E6E4DD]'
-                }
-                `}
-            >
-                {tab.type === 'chat'
-                    ? <MessageSquare size={14} />
-                    : (tab.loading ? <Loader2 size={14} className="animate-spin"/> : <BookOpen size={14} />)
-                }
-                <span className="max-w-[100px] truncate">{tab.title}</span>
-                {tab.id !== 'main' && (
-                <span
-                    onClick={(e) => closeTab(e, tab.id)}
-                    className={`ml-1 p-0.5 rounded-full ${activeTabId === tab.id ? 'hover:bg-gray-700' : 'hover:bg-gray-300'}`}
+              {/* Tabs */}
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTabId(tab.id)}
+                  className={`
+                    flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 shrink-0
+                    ${activeTabId === tab.id
+                      ? 'bg-[#1C1C1A] text-white shadow-md'
+                      : 'bg-[#F2F0EB] text-[#5C5C5A] hover:bg-[#E6E4DD]'
+                    }
+                  `}
                 >
-                    <X size={12} />
-                </span>
-                )}
-            </button>
-            ))}
-          </nav>
+                  {tab.type === 'chat'
+                    ? <MessageSquare size={14} />
+                    : tab.type === 'artifact'
+                    ? <Code size={14} />
+                    : (tab.loading ? <Loader2 size={14} className="animate-spin"/> : <BookOpen size={14} />)
+                  }
+                  <span className="max-w-[120px] truncate">{tab.title}</span>
+                  {tab.id !== 'main' && (
+                    <span
+                      onClick={(e) => closeTab(e, tab.id)}
+                      className={`ml-1 p-0.5 rounded-full ${activeTabId === tab.id ? 'hover:bg-gray-700' : 'hover:bg-gray-300'}`}
+                    >
+                      <X size={12} />
+                    </span>
+                  )}
+                </button>
+              ))}
+
+              {/* Spacer */}
+              <div className="flex-1" />
+
+              {/* Keyboard hints */}
+              <div className="hidden md:flex items-center gap-3 text-[11px] text-[#9B9B9B] shrink-0">
+                <span><kbd className="px-1.5 py-0.5 bg-[#F2F0EB] rounded text-[10px]">Opt</kbd> + <kbd className="px-1.5 py-0.5 bg-[#F2F0EB] rounded text-[10px]">←→</kbd> Navigate</span>
+                <span><kbd className="px-1.5 py-0.5 bg-[#F2F0EB] rounded text-[10px]">Opt</kbd> + <kbd className="px-1.5 py-0.5 bg-[#F2F0EB] rounded text-[10px]">↓</kbd> Close</span>
+              </div>
+            </nav>
+          )}
       </div>
 
       <style>{`

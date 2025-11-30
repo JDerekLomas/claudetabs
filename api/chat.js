@@ -13,7 +13,7 @@ export default async function handler(req) {
   }
 
   try {
-    const { messages, model = 'claude-opus-4-20250514' } = await req.json();
+    const { messages, system, model = 'claude-sonnet-4-20250514' } = await req.json();
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -27,12 +27,20 @@ export default async function handler(req) {
       apiKey: apiKey,
     });
 
-    // Create a streaming response
-    const stream = await anthropic.messages.stream({
+    // Build request options
+    const requestOptions = {
       model: model,
       max_tokens: 4096,
       messages: messages,
-    });
+    };
+
+    // Add system prompt if provided
+    if (system) {
+      requestOptions.system = system;
+    }
+
+    // Create a streaming response
+    const stream = await anthropic.messages.stream(requestOptions);
 
     // Convert Anthropic stream to Response stream
     const encoder = new TextEncoder();

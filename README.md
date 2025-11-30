@@ -77,24 +77,31 @@ This project is configured for Vercel deployment with serverless API integration
 - Learning mode toggle to enable/disable concept highlighting
 
 ### 2. Learning Tabs
-- Click highlighted %%concepts%% in responses to open deep dive tabs
+- Click [[learning links::with inline definitions]] in responses to open deep dive tabs
 - Each learning tab provides:
-  - Instant summary (pre-generated)
-  - Full explanation with streaming
+  - Instant summary from the inline definition
+  - Full streaming explanation
   - Related concepts to explore
   - Side conversation thread
 
-### 3. Text Selection
+### 3. React Artifacts
+- Live preview of React/JSX code blocks with Sandpack
+- Available libraries: lucide-react, recharts, framer-motion, date-fns, lodash, mathjs
+- Tailwind CSS support via CDN
+- Code/Split/Preview view modes
+- Artifacts open as tabs for full-screen experience
+
+### 4. Text Selection
 - Highlight any text in messages
 - Click "Deep Dive" to open a learning tab about that topic
 - Contextual learning on demand
 
-### 4. Learning Profile
+### 5. Learning Profile
 - Customize your interests and learning preferences
 - Claude adapts explanations based on your profile
 - Accessible via Settings in sidebar
 
-### 5. Keyboard Navigation
+### 6. Keyboard Navigation
 - Fast tab switching with Option + arrow keys
 - Quick access to new learning tabs
 - Efficient workflow for power users
@@ -103,8 +110,9 @@ This project is configured for Vercel deployment with serverless API integration
 
 - **React** with hooks for state management
 - **Tailwind CSS** for styling
+- **Sandpack** for live React code previews
 - **Lucide React** for icons
-- **Claude API** (Opus 4) via Vercel serverless functions
+- **Claude API** (Sonnet) via Vercel Edge functions with streaming
 - **Vite** for build tooling
 
 ## Project Structure
@@ -115,10 +123,14 @@ claudetabs/
 │   └── chat.js              # Vercel serverless function for Claude API
 ├── src/
 │   ├── App.jsx              # Main application with all features
+│   ├── components/
+│   │   ├── ArtifactPreview.jsx   # Sandpack-based React preview
+│   │   └── MarkdownRenderer.jsx  # Markdown with learning links
 │   ├── main.jsx             # Entry point
-│   └── index.css            # Global styles
+│   └── index.css            # Global styles + Tailwind
 ├── index.html               # HTML template
 ├── vercel.json              # Vercel configuration
+├── tailwind.config.js       # Tailwind configuration
 ├── package.json             # Dependencies and scripts
 └── README.md                # This file
 ```
@@ -129,7 +141,7 @@ The app uses a Vercel serverless function (`/api/chat`) that:
 - Handles streaming responses from Claude API
 - Keeps API key secure server-side
 - Supports both main chat and learning tab conversations
-- Parses highlighted terms (%%term%%) for interactive learning
+- Uses [[term::definition]] syntax for inline learning links
 
 ## Design Philosophy
 

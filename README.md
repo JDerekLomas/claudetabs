@@ -1,18 +1,48 @@
-# Claude Tabs Demo
+# Claude Tabs
 
-An interactive demonstration of a redesigned Claude interface with tabbed conversations.
+## Supporting Curiosity-Driven Learning While Vibecoding
+
+What if Claude vibecoding sessions could be supplemented with links that allowed users to explore technical concepts in parallel tabs within the Claude Web UI?
+
+The goal of **Claude Tabs** is to support curiosity-driven "Deep Dives" to supplement human understanding while conducting AI work, particularly vibecoding.
 
 ## Concept
 
-This demo showcases how Claude could be redesigned to support multiple tabs within a single conversation, allowing users to manage parallel conversation threads or topics more effectively.
+While vibecoding, you can open up new tabs to learn more about the software libraries or design approach—supporting intrinsically motivated learning.
 
-### Key Features
+**Claude tabs supports the flow of curiosity around the flow of work.**
 
-- **Conversation Management**: Create and manage multiple conversations
-- **Tabbed Interface**: Each conversation can have multiple tabs for different topics or contexts
-- **Auto-naming**: New conversations are automatically named based on the first message
-- **Tab Count Badge**: Conversations with multiple tabs show a badge indicating the number of tabs
-- **Interactive**: Fully functional demo with message sending, tab switching, and tab management
+## Key Features
+
+### Learning Mode
+
+With learning mode on, when you ask Claude to perform a task—like create some vibecoded software—Claude will highlight key technical terms and generally support your learning goals—as expressed (and editable) in your learner profile.
+
+**Learning Links** highlight relevant concepts for further learning. Clicking those links opens a new tab with about 50 words that are generated at the time of the highlight for instant gratification of curiosity. A fast first token model then completes the resource page.
+
+Learning links provide immediate curiosity satisfaction without disrupting the flow of the main task.
+
+### Tabs Organization
+
+Tabs within Claude help organize multiple Claude conversations into a single main chat.
+
+**Side conversations**: Faster, cheaper models. But also voice-based side conversations. Side conversations have the summarized context of the main chat but the transcripts of the side conversation are not in the context of the main chat. This keeps context clean and reduces the number of chats created by power users. It also creates a personal knowledge base based on an individual's curiosity.
+
+### Text Selection Deep Dive
+
+With Claude Tabs, you can also highlight any text to "Learn More"—so you can dive deep on anything in a side conversation.
+
+**Keep Learning.**
+
+### Keyboard Shortcuts
+
+- **Opt + ←/→**: Navigate between tabs
+- **Opt + ↑**: Open new learning tab
+- **Opt + ↓**: Close current tab (if not main)
+
+## Product Notes
+
+Currently, Claude Tabs is only available in learning mode. From a product perspective, learning mode is a great place to try out new UI possibilities because users would expect additional features and support—but the stakes are lower than a full platform release.
 
 ## How to Use
 
@@ -22,7 +52,7 @@ This demo showcases how Claude could be redesigned to support multiple tabs with
 npm install
 ```
 
-### Running the Demo
+### Running Locally
 
 ```bash
 npm run dev
@@ -30,76 +60,99 @@ npm run dev
 
 Then open your browser to `http://localhost:5173`
 
-## Features Demonstrated
+### Deploying to Vercel
 
-### 1. Creating New Conversations
-- Click the "New Chat" button in the sidebar
-- The conversation is initially named "New Chat"
-- After the first message is sent, the conversation is automatically renamed based on that message
+This project is configured for Vercel deployment with serverless API integration.
 
-### 2. Managing Tabs
-- **Add Tab**: Click the "+" button in the tab bar to create a new tab within the current conversation
-- **Switch Tabs**: Click on any tab to switch to it
-- **Close Tab**: Click the "×" button on a tab to close it (cannot close the last tab)
-- Each tab maintains its own conversation history
+1. Connect your GitHub repository to Vercel
+2. Set the `ANTHROPIC_API_KEY` environment variable in Vercel project settings
+3. Deploy
 
-### 3. Sidebar Features
-- View all conversations
-- See how many tabs each conversation has
-- Toggle sidebar visibility with the menu button
-- Click on any conversation to switch to it
+## Features
 
-### 4. Messaging
-- Type a message in the input field at the bottom
-- Press Enter or click the send button to send
-- Each tab maintains its own conversation thread
-- Messages are displayed with user and assistant avatars
+### 1. Main Chat
+- Standard Claude conversation interface
+- Auto-naming based on first message
+- Real-time streaming responses
+- Learning mode toggle to enable/disable concept highlighting
+
+### 2. Learning Tabs
+- Click highlighted %%concepts%% in responses to open deep dive tabs
+- Each learning tab provides:
+  - Instant summary (pre-generated)
+  - Full explanation with streaming
+  - Related concepts to explore
+  - Side conversation thread
+
+### 3. Text Selection
+- Highlight any text in messages
+- Click "Deep Dive" to open a learning tab about that topic
+- Contextual learning on demand
+
+### 4. Learning Profile
+- Customize your interests and learning preferences
+- Claude adapts explanations based on your profile
+- Accessible via Settings in sidebar
+
+### 5. Keyboard Navigation
+- Fast tab switching with Option + arrow keys
+- Quick access to new learning tabs
+- Efficient workflow for power users
 
 ## Technical Stack
 
-- **React**: UI framework
-- **Vite**: Build tool and dev server
-- **CSS**: Custom styling to match Claude's interface design
-
-## Design Choices
-
-1. **Tab-based Organization**: Each conversation can have multiple tabs, allowing users to explore different topics or approaches within the same conversation context
-
-2. **Visual Hierarchy**:
-   - Conversations in the sidebar
-   - Tabs within each conversation
-   - Messages within each tab
-
-3. **Conversation Naming**: Automatically names conversations based on the first message, making it easy to identify conversations at a glance
-
-4. **Tab Count Indicator**: Shows users which conversations have multiple tabs without having to open them
-
-## Future Enhancements
-
-This demo could be extended with:
-- Drag and drop to reorder tabs
-- Tab renaming functionality
-- Keyboard shortcuts for tab navigation
-- Export/share individual tabs
-- Search within tabs
-- Tab templates for common use cases
-- Persistence with localStorage or backend integration
-- Real Claude API integration
+- **React** with hooks for state management
+- **Tailwind CSS** for styling
+- **Lucide React** for icons
+- **Claude API** (Opus 4) via Vercel serverless functions
+- **Vite** for build tooling
 
 ## Project Structure
 
 ```
 claudetabs/
+├── api/
+│   └── chat.js              # Vercel serverless function for Claude API
 ├── src/
-│   ├── App.jsx          # Main application component with all logic
-│   ├── App.css          # Styling for the application
-│   ├── main.jsx         # Entry point
-│   └── index.css        # Global styles
-├── index.html           # HTML template
-├── package.json         # Dependencies and scripts
-└── README.md           # This file
+│   ├── App.jsx              # Main application with all features
+│   ├── main.jsx             # Entry point
+│   └── index.css            # Global styles
+├── index.html               # HTML template
+├── vercel.json              # Vercel configuration
+├── package.json             # Dependencies and scripts
+└── README.md                # This file
 ```
 
-## License
+## API Integration
 
-This is a demonstration project for showcasing the concept of tabbed conversations in Claude.
+The app uses a Vercel serverless function (`/api/chat`) that:
+- Handles streaming responses from Claude API
+- Keeps API key secure server-side
+- Supports both main chat and learning tab conversations
+- Parses highlighted terms (%%term%%) for interactive learning
+
+## Design Philosophy
+
+The interface matches Claude's production design while adding innovative learning features:
+- Warm cream background (#F4F4F2)
+- Coral orange accents (#D97757) for learning mode
+- Clean typography with serif fonts for AI responses
+- Subtle animations and transitions
+- Mobile-responsive layout
+
+## Future Enhancements
+
+- Voice-based side conversations
+- Persistent learning history and knowledge base
+- Export learning paths
+- Collaborative learning sessions
+- Integration with external knowledge sources
+- Advanced concept mapping
+
+## Demo
+
+Visit the live demo at: [https://claudetabs.vercel.app/](https://claudetabs.vercel.app/)
+
+---
+
+**Claude Tabs** - Where curiosity meets productivity.

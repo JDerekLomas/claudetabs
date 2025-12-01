@@ -399,7 +399,10 @@ YOUR BEHAVIOR:
       // Parse RELATED section after streaming completes
       const relatedMatch = fullText.match(/RELATED:\s*(.+)$/i);
       const related = relatedMatch
-        ? relatedMatch[1].split(',').map(t => t.trim()).filter(t => t)
+        ? relatedMatch[1]
+            .split(',')
+            .map(t => t.trim().replace(/^\[\[|\]\]$/g, '')) // Strip [[brackets]]
+            .filter(t => t && t.length > 0)
         : [];
 
       const explanation = relatedMatch

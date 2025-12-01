@@ -1,6 +1,9 @@
 import React, { useState, memo, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Copy, Check, Play, Code, ExternalLink } from 'lucide-react';
@@ -207,7 +210,8 @@ export default function MarkdownRenderer({
       className={`markdown-content ${isSerif ? 'font-serif' : 'font-sans'} leading-relaxed`}
     >
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
         components={{
           // Custom code block rendering
           code({ node, inline, className, children, ...props }) {

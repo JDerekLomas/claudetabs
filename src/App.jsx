@@ -25,7 +25,6 @@ import {
   PanelLeftClose,
   PanelLeft,
   GraduationCap,
-  Star,
   User,
   Target,
   Lightbulb,
@@ -198,21 +197,21 @@ Design: Modern aesthetics with gradients, shadows, animations.`;
   };
 
   const getDeepDiveSystemPrompt = (term) => {
-    return `You are Claude explaining a concept in a focused Deep Dive sidebar.
+    return `You are Claude explaining "${term}" in a focused Deep Dive sidebar.
 
-LEARNER PROFILE:
+CONCEPT: "${term}"
+
+YOUR TASK (80% concept, 20% personalization):
+1. Explain "${term}" clearly and thoroughly - what it is, how it works, why it matters
+2. Focus on the concept itself, not the learner's interests
+3. Include 2-3 learning links for related technical concepts: [[term::50-word explanation]]
+4. Use code examples if they help clarify (use proper fenced code blocks)
+5. End with: RELATED: Term 1, Term 2, Term 3
+
+LEARNER CONTEXT (use sparingly - just to calibrate depth/examples):
 ${userProfile}
 
-CONCEPT TO EXPLAIN: "${term}"
-
-YOUR TASK:
-1. Explain "${term}" clearly and concisely (2-3 paragraphs max)
-2. Adapt your explanation to match the learner's background and interests
-3. Include 2-3 learning links for related concepts: [[term::brief definition]]
-4. Use code examples if they help clarify (use proper fenced code blocks)
-5. End with: RELATED: Term 1, Term 2, Term 3 (suggest 2-3 related concepts to explore next)
-
-Keep it focused - this is a sidebar exploration, not a full lesson.`;
+Be direct and informative. This is a reference explanation, not a personalized lesson.`;
   };
 
   const getSideChatSystemPrompt = (topic) => {
@@ -700,7 +699,10 @@ YOUR BEHAVIOR:
                       <span>Learning Mode Active</span>
                     </div>
                     <p className="text-sm text-[#6B6B6B] mt-3 max-w-md mx-auto leading-relaxed">
-                      Click to explore <span className="text-[#D97757] font-medium">highlighted</span> responses in side tabs. Or highlight any text and select "Deep Dive."
+                      Click to explore <button
+                        onClick={() => handleOpenTab('Learning Mode', 'Learning Mode is a feature that highlights key technical concepts, library names, and patterns in Claude\'s responses. When you see highlighted text, you can click it to open a Deep Dive tab that explains the concept in depth. This supports curiosity-driven learning while you work—letting you explore ideas without losing your place in the main conversation.')}
+                        className="text-[#D97757] font-medium border-b border-[#D97757] border-opacity-40 hover:bg-orange-50 cursor-pointer"
+                      >highlighted</button> responses in side tabs. Or highlight any text and select "Deep Dive."
                     </p>
                   </div>
                 )}
@@ -1179,30 +1181,6 @@ YOUR BEHAVIOR:
                 <span>Learning Mode</span>
                 {learningModeOn && <span className="ml-auto text-xs bg-[#D97757] text-white px-1.5 py-0.5 rounded">ON</span>}
               </button>
-            </div>
-
-            {/* Starred section */}
-            <div className="px-3 py-2">
-              <div className="flex items-center gap-2 text-xs font-medium text-[#9B9B9B] uppercase tracking-wider mb-2">
-                <Star size={12} />
-                Starred
-              </div>
-              <div className="space-y-1">
-                {chatHistory.filter((_, i) => i < 3).map(chat => (
-                  <button
-                    key={`starred-${chat.id}`}
-                    onClick={() => {
-                      setActiveChatId(chat.id);
-                      setActiveTabId('main');
-                      setTabs(prev => prev.map(t => t.id === 'main' ? { ...t, title: chat.title } : t));
-                      setSidebarOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#EFECE6] text-sm text-[#424240] truncate"
-                  >
-                    {chat.title}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Recents section */}

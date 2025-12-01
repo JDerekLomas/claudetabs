@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   MessageSquare,
   X,
@@ -80,51 +80,105 @@ export default function ClaudeLearningPrototype() {
   // User Profile State (Background ||| Aspirations ||| Learning Goals)
   const [userProfile, setUserProfile] = useState("I'm a professor of positive AI at Delft University of Technology. I have a background in cognitive science, art, human-centered design, and HCI.|||I want to make top-level connections in AI & experience design, particularly in education.|||I want to understand React more deeply and keep getting better and better at vibecoding.");
 
-  // Chat Data State - store messages per chat
+  // Default tabs for a new chat
+  const DEFAULT_TABS = [{ id: 'main', title: 'New Chat', type: 'chat', content: null }];
+
+  // Chat Data State - store messages AND tabs per chat
   const [chats, setChats] = useState({
     'chat-1': {
       title: 'Help me build a marble run in three.js',
-      messages: DEFAULT_CHAT.messages
+      messages: DEFAULT_CHAT.messages,
+      tabs: [{ id: 'main', title: 'Help me build a marble run in three.js', type: 'chat', content: null }],
+      activeTabId: 'main'
     },
     'chat-2': {
       title: 'Understanding Redux Middleware',
-      messages: []
+      messages: [],
+      tabs: [{ id: 'main', title: 'Understanding Redux Middleware', type: 'chat', content: null }],
+      activeTabId: 'main'
     },
     'chat-3': {
       title: 'CSS Grid Layouts',
-      messages: []
+      messages: [],
+      tabs: [{ id: 'main', title: 'CSS Grid Layouts', type: 'chat', content: null }],
+      activeTabId: 'main'
     }
   });
   const [activeChatId, setActiveChatId] = useState('chat-1');
 
+  // Ref to always have access to the latest activeChatId (prevents stale closures)
+  const activeChatIdRef = useRef(activeChatId);
+  useEffect(() => {
+    activeChatIdRef.current = activeChatId;
+  }, [activeChatId]);
+
   // Derived state for current chat
   const messages = chats[activeChatId]?.messages || [];
   const setMessages = (updater) => {
-    setChats(prev => ({
-      ...prev,
-      [activeChatId]: {
-        ...prev[activeChatId],
-        messages: typeof updater === 'function'
-          ? updater(prev[activeChatId]?.messages || [])
-          : updater
-      }
-    }));
+    setChats(prev => {
+      const targetChatId = activeChatIdRef.current;
+      return {
+        ...prev,
+        [targetChatId]: {
+          ...prev[targetChatId],
+          messages: typeof updater === 'function'
+            ? updater(prev[targetChatId]?.messages || [])
+            : updater
+        }
+      };
+    });
   };
 
-  // Chat history derived from chats
-  const chatHistory = Object.entries(chats).map(([id, chat]) => ({
-    id,
-    title: chat.title
-  }));
+  // Derived tabs state for current chat
+  const tabs = chats[activeChatId]?.tabs || DEFAULT_TABS;
+  const activeTabId = chats[activeChatId]?.activeTabId || 'main';
+
+  // Use ref to always get the latest activeChatId (prevents stale closures in async operations)
+  const setTabs = (updater) => {
+    setChats(prev => {
+      const targetChatId = activeChatIdRef.current;
+      return {
+        ...prev,
+        [targetChatId]: {
+          ...prev[targetChatId],
+          tabs: typeof updater === 'function'
+            ? updater(prev[targetChatId]?.tabs || DEFAULT_TABS)
+            : updater
+        }
+      };
+    });
+  };
+
+  const setActiveTabId = (tabId) => {
+    setChats(prev => {
+      const targetChatId = activeChatIdRef.current;
+      return {
+        ...prev,
+        [targetChatId]: {
+          ...prev[targetChatId],
+          activeTabId: tabId
+        }
+      };
+    });
+  };
+
+  // Chat history derived from chats - sorted newest first
+  const chatHistory = Object.entries(chats)
+    .map(([id, chat]) => ({
+      id,
+      title: chat.title
+    }))
+    .sort((a, b) => {
+      // Extract timestamp from chat ID (format: chat-{timestamp})
+      const timeA = parseInt(a.id.split('-')[1]) || 0;
+      const timeB = parseInt(b.id.split('-')[1]) || 0;
+      return timeB - timeA; // Newest first
+    });
 
   // Input State
   const [inputText, setInputText] = useState("");
   const [sideInputText, setSideInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-
-  // Tab State
-  const [tabs, setTabs] = useState([{ id: 'main', title: 'New Chat', type: 'chat', content: null }]);
-  const [activeTabId, setActiveTabId] = useState('main');
 
   // Concept cache for Deep Dive tab summaries
   const [conceptCache, setConceptCache] = useState(DEFAULT_PRELOADED_SUMMARIES);
@@ -710,11 +764,14 @@ Toggle Learning Mode in settings. Click a highlighted concept. Follow your curio
     const newChatId = `chat-${Date.now()}`;
     setChats(prev => ({
       ...prev,
-      [newChatId]: { title: 'New Chat', messages: [] }
+      [newChatId]: {
+        title: 'New Chat',
+        messages: [],
+        tabs: [{ id: 'main', title: 'New Chat', type: 'chat', content: null }],
+        activeTabId: 'main'
+      }
     }));
     setActiveChatId(newChatId);
-    setTabs([{ id: 'main', title: 'New Chat', type: 'chat', content: null }]);
-    setActiveTabId('main');
     setSidebarOpen(false);
   };
 
@@ -1324,8 +1381,7 @@ Toggle Learning Mode in settings. Click a highlighted concept. Follow your curio
                     key={chat.id}
                     onClick={() => {
                       setActiveChatId(chat.id);
-                      setActiveTabId('main');
-                      setTabs(prev => prev.map(t => t.id === 'main' ? { ...t, title: chat.title } : t));
+                      // Tabs are now stored per-chat, so switching chats automatically shows that chat's tabs
                       setSidebarOpen(false);
                     }}
                     className={`w-full text-left px-3 py-2 rounded-lg transition-colors text-sm truncate ${

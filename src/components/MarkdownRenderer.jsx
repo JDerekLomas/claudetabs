@@ -166,15 +166,19 @@ export default function MarkdownRenderer({
   // Artifact-capable languages
   const artifactLanguages = ['jsx', 'tsx', 'react', 'html'];
 
-  // Event delegation for learning links - avoids stale closure issues during streaming
+  // Event delegation for learning links - uses mousedown to fire immediately
+  // before React can re-render during streaming
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !onChipClick) return;
 
-    const handleClick = (e) => {
+    const handleMouseDown = (e) => {
       // Find the learning link element (could be the target or an ancestor)
       const learningLink = e.target.closest('[data-learning-link="true"]');
       if (!learningLink) return;
+
+      // Only handle left clicks
+      if (e.button !== 0) return;
 
       e.preventDefault();
       e.stopPropagation();
@@ -188,8 +192,8 @@ export default function MarkdownRenderer({
       }
     };
 
-    container.addEventListener('click', handleClick);
-    return () => container.removeEventListener('click', handleClick);
+    container.addEventListener('mousedown', handleMouseDown);
+    return () => container.removeEventListener('mousedown', handleMouseDown);
   }, [onChipClick]);
 
   return (

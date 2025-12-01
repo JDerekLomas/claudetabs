@@ -617,6 +617,45 @@ YOUR BEHAVIOR:
     }
   };
 
+  // --- Static Pages ---
+  const STATIC_PAGES = {
+    'Learning Mode': `## Supporting Curiosity-Driven Learning
+
+**Claude Tabs** supports curiosity-driven "Deep Dives" to supplement human understanding while conducting AI work, particularly vibecoding.
+
+While vibecoding, you can open up new tabs to learn more about the software libraries or design approach—supporting intrinsically motivated learning.
+
+**Claude Tabs supports the flow of curiosity around the flow of work.**
+
+---
+
+### How It Works
+
+With Learning Mode on, when you ask Claude to perform a task—like create some vibecoded software—Claude will highlight key technical terms and library names.
+
+**Learning Links** highlight relevant concepts for further learning. Clicking those links opens a new tab that explains the concept in depth.
+
+Learning links provide immediate curiosity satisfaction without disrupting the flow of the main task.
+
+---
+
+### Text Selection Deep Dive
+
+You can also highlight any text to "Learn More"—so you can dive deep on anything in a side conversation.
+
+---
+
+### Keyboard Shortcuts
+
+- **Opt + ←/→**: Navigate between tabs
+- **Opt + ↑**: Open new learning tab
+- **Opt + ↓**: Close current tab (if not main)
+
+---
+
+**Keep Learning.**`
+  };
+
   // --- Handlers ---
   // handleOpenTab accepts optional definition from [[term::definition]] links
   const handleOpenTab = async (term, definition = null) => {
@@ -627,6 +666,20 @@ YOUR BEHAVIOR:
     const existingTab = tabs.find(t => t.title.toLowerCase() === term.toLowerCase());
     if (existingTab) {
       setActiveTabId(existingTab.id);
+      return;
+    }
+
+    // Check for static pages first
+    if (STATIC_PAGES[term]) {
+      const newTabId = `tab-${Date.now()}`;
+      const newTab = {
+        id: newTabId,
+        title: term,
+        type: 'static',
+        content: STATIC_PAGES[term]
+      };
+      setTabs(prev => [...prev, newTab]);
+      setActiveTabId(newTabId);
       return;
     }
 
@@ -700,7 +753,7 @@ YOUR BEHAVIOR:
                     </div>
                     <p className="text-sm text-[#6B6B6B] mt-3 max-w-md mx-auto leading-relaxed">
                       Click to explore <button
-                        onClick={() => handleOpenTab('Learning Mode', 'Learning Mode is a feature that highlights key technical concepts, library names, and patterns in Claude\'s responses. When you see highlighted text, you can click it to open a Deep Dive tab that explains the concept in depth. This supports curiosity-driven learning while you work—letting you explore ideas without losing your place in the main conversation.')}
+                        onClick={() => handleOpenTab('Learning Mode')}
                         className="text-[#D97757] font-medium border-b border-[#D97757] border-opacity-40 hover:bg-orange-50 cursor-pointer"
                       >highlighted</button> responses in side tabs. Or highlight any text and select "Deep Dive."
                     </p>
@@ -765,6 +818,33 @@ YOUR BEHAVIOR:
             title={activeTab.title}
             onClose={() => closeTab(null, activeTab.id)}
           />
+        </div>
+      );
+    }
+
+    // Static page tab (e.g., Learning Mode info)
+    if (activeTab.type === 'static') {
+      return (
+        <div className="flex-1 flex flex-col bg-white animate-in slide-in-from-right-10 duration-300">
+          <div className="p-6 md:p-8 pb-4 border-b border-gray-100">
+            <div className="flex items-center gap-2 text-[#D97757] text-xs font-bold tracking-wider uppercase mb-2">
+              <Sparkles size={12} />
+              Guide
+            </div>
+            <h1 className={`text-3xl md:text-4xl ${FONTS.serif} text-[#141413] leading-tight`}>
+              {activeTab.title}
+            </h1>
+          </div>
+          <div className="flex-1 overflow-y-auto p-6 md:p-8">
+            <div className="text-[#141413] text-lg leading-relaxed font-serif">
+              <MarkdownRenderer
+                content={activeTab.content}
+                onChipClick={handleOpenTab}
+                onRunArtifact={handleRunArtifact}
+                isSerif={true}
+              />
+            </div>
+          </div>
         </div>
       );
     }

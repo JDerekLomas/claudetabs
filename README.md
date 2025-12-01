@@ -10,39 +10,65 @@ The goal of **Claude Tabs** is to support curiosity-driven "Deep Dives" to suppl
 
 While vibecoding, you can open up new tabs to learn more about the software libraries or design approach—supporting intrinsically motivated learning.
 
-**Claude tabs supports the flow of curiosity around the flow of work.**
+**Claude Tabs supports the flow of curiosity around the flow of work.**
 
 ## Key Features
 
 ### Learning Mode
 
-With learning mode on, when you ask Claude to perform a task—like create some vibecoded software—Claude will highlight key technical terms and generally support your learning goals—as expressed (and editable) in your learner profile.
+With learning mode on, when you ask Claude to perform a task—like create some vibecoded software—Claude will highlight key technical terms weighted toward your learning goals (as expressed in your editable learner profile).
 
-**Learning Links** highlight relevant concepts for further learning. Clicking those links opens a new tab with about 50 words that are generated at the time of the highlight for instant gratification of curiosity. A fast first token model then completes the resource page.
+**Learning Links** use the `[[term]]` syntax to highlight relevant concepts. Clicking opens a Deep Dive tab with a streaming explanation from Claude Haiku for fast response times. Learning links are weighted toward the learner's stated interests and goals.
 
-Learning links provide immediate curiosity satisfaction without disrupting the flow of the main task.
+### Per-Chat Tabs
 
-### Tabs Organization
+Each chat maintains its own set of tabs. When you switch between chats in the sidebar, the tabs associated with that chat are preserved. This keeps your Deep Dives organized by context.
 
-Tabs within Claude help organize multiple Claude conversations into a single main chat.
-
-**Side conversations**: Faster, cheaper models. But also voice-based side conversations. Side conversations have the summarized context of the main chat but the transcripts of the side conversation are not in the context of the main chat. This keeps context clean and reduces the number of chats created by power users. It also creates a personal knowledge base based on an individual's curiosity.
+- Open multiple Deep Dive tabs per conversation
+- Artifact previews open as tabs
+- Tabs persist when switching between chats
+- Close tabs to return to main chat
 
 ### Text Selection Deep Dive
 
-With Claude Tabs, you can also highlight any text to "Learn More"—so you can dive deep on anything in a side conversation.
+Highlight any text in a message and click "Deep Dive" to open a learning tab about that topic. Context from your main chat is passed to disambiguate technical terms.
 
-**Keep Learning.**
+### React Artifacts
+
+Code blocks with `jsx`, `tsx`, `react`, or `html` languages show a "Preview" button. Click to open a live Sandpack preview as a tab with:
+
+- Code/Split/Preview view modes
+- Available libraries: lucide-react, recharts, framer-motion, date-fns, lodash, mathjs
+- Tailwind CSS support via CDN
+- Fullscreen mode
 
 ### Keyboard Shortcuts
 
-- **Opt + ←/→**: Navigate between tabs
-- **Opt + ↑**: Open new learning tab
-- **Opt + ↓**: Close current tab (if not main)
+| Shortcut | Action |
+|----------|--------|
+| **Opt + ←/→** | Navigate between tabs |
+| **Opt + ↑** | Open new learning tab |
+| **Opt + ↓** | Close current tab (if not main) |
 
-## Product Notes
+## Settings
 
-Currently, Claude Tabs is only available in learning mode. From a product perspective, learning mode is a great place to try out new UI possibilities because users would expect additional features and support—but the stakes are lower than a full platform release.
+Access settings via the graduation cap icon in the sidebar:
+
+### Learner Profile Tab
+- **Your Background**: Your experience and expertise
+- **Aspirations**: What you want to achieve
+- **Learning Goals**: Specific things you want to learn
+
+Claude uses this profile to:
+1. Weight learning links toward your interests
+2. Adapt explanations to your level
+3. Connect concepts to your goals
+
+### System Prompts Tab
+View the system prompts used for:
+- Main chat (with Learning Mode)
+- Deep Dive explanations
+- Side conversations
 
 ## How to Use
 
@@ -68,51 +94,16 @@ This project is configured for Vercel deployment with serverless API integration
 2. Set the `ANTHROPIC_API_KEY` environment variable in Vercel project settings
 3. Deploy
 
-## Features
-
-### 1. Main Chat
-- Standard Claude conversation interface
-- Auto-naming based on first message
-- Real-time streaming responses
-- Learning mode toggle to enable/disable concept highlighting
-
-### 2. Learning Tabs
-- Click [[learning links::with inline definitions]] in responses to open deep dive tabs
-- Each learning tab provides:
-  - Instant summary from the inline definition
-  - Full streaming explanation
-  - Related concepts to explore
-  - Side conversation thread
-
-### 3. React Artifacts
-- Live preview of React/JSX code blocks with Sandpack
-- Available libraries: lucide-react, recharts, framer-motion, date-fns, lodash, mathjs
-- Tailwind CSS support via CDN
-- Code/Split/Preview view modes
-- Artifacts open as tabs for full-screen experience
-
-### 4. Text Selection
-- Highlight any text in messages
-- Click "Deep Dive" to open a learning tab about that topic
-- Contextual learning on demand
-
-### 5. Learning Profile
-- Customize your interests and learning preferences
-- Claude adapts explanations based on your profile
-- Accessible via Settings in sidebar
-
-### 6. Keyboard Navigation
-- Fast tab switching with Option + arrow keys
-- Quick access to new learning tabs
-- Efficient workflow for power users
-
 ## Technical Stack
 
 - **React** with hooks for state management
 - **Tailwind CSS** for styling
 - **Sandpack** for live React code previews
+- **KaTeX** for LaTeX math rendering
 - **Lucide React** for icons
-- **Claude API** (Sonnet) via Vercel Edge functions with streaming
+- **Claude API** via Vercel Edge functions with streaming
+  - Sonnet 4 for main chat
+  - Haiku for Deep Dives and side conversations
 - **Vite** for build tooling
 
 ## Project Structure
@@ -125,7 +116,7 @@ claudetabs/
 │   ├── App.jsx              # Main application with all features
 │   ├── components/
 │   │   ├── ArtifactPreview.jsx   # Sandpack-based React preview
-│   │   └── MarkdownRenderer.jsx  # Markdown with learning links
+│   │   └── MarkdownRenderer.jsx  # Markdown with learning links + LaTeX
 │   ├── main.jsx             # Entry point
 │   └── index.css            # Global styles + Tailwind
 ├── index.html               # HTML template
@@ -140,8 +131,24 @@ claudetabs/
 The app uses a Vercel serverless function (`/api/chat`) that:
 - Handles streaming responses from Claude API
 - Keeps API key secure server-side
-- Supports both main chat and learning tab conversations
-- Uses [[term::definition]] syntax for inline learning links
+- Supports model selection (Sonnet for main, Haiku for side chats)
+- Uses `[[term]]` syntax for learning links
+- Supports up to 8192 tokens per response
+
+## Architecture Notes
+
+### Per-Chat State
+Each chat stores:
+- `title`: Chat name (auto-generated from first message)
+- `messages`: Conversation history
+- `tabs`: Array of tabs (main chat, Deep Dives, artifacts)
+- `activeTabId`: Currently selected tab
+
+### Stale Closure Prevention
+Uses `useRef` to track `activeChatId` for async operations, ensuring tabs are added to the correct chat even during streaming responses.
+
+### Event Delegation for Learning Links
+Learning links use `mousedown` event delegation to fire immediately before React re-renders during streaming, preventing missed clicks.
 
 ## Design Philosophy
 

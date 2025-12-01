@@ -32,7 +32,7 @@ const CopyButton = ({ code }) => {
   return (
     <button
       onClick={handleCopy}
-      className="absolute top-2 right-2 p-1.5 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors"
+      className="p-1.5 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors"
       title="Copy code"
     >
       {copied ? <Check size={14} /> : <Copy size={14} />}

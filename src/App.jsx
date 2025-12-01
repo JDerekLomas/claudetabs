@@ -129,7 +129,7 @@ export default function ClaudeLearningPrototype() {
   // Concept cache for Deep Dive tab summaries
   const [conceptCache, setConceptCache] = useState(DEFAULT_PRELOADED_SUMMARIES);
 
-  // Handler for running artifacts - opens as a tab instead of modal
+  // Handler for running artifacts - opens as a tab right after main chat
   const handleRunArtifact = (code, language) => {
     const artifactTabId = `artifact-${Date.now()}`;
     const newTab = {
@@ -141,7 +141,12 @@ export default function ClaudeLearningPrototype() {
         language
       }
     };
-    setTabs(prev => [...prev, newTab]);
+    // Insert right after main tab (index 1) so closing returns to main
+    setTabs(prev => {
+      const mainIndex = prev.findIndex(t => t.id === 'main');
+      const insertIndex = mainIndex + 1;
+      return [...prev.slice(0, insertIndex), newTab, ...prev.slice(insertIndex)];
+    });
     setActiveTabId(artifactTabId);
   };
 
@@ -625,41 +630,43 @@ YOUR BEHAVIOR:
 
   // --- Static Pages ---
   const STATIC_PAGES = {
-    'Learning Mode': `## Supporting Curiosity-Driven Learning
+    'Learning Mode': `**Learn while you build.**
 
-**Claude Tabs** supports curiosity-driven "Deep Dives" to supplement human understanding while conducting AI work, particularly vibecoding.
+When you're working with Claude, questions come up. What's that library? Why that approach? What does this pattern actually do?
 
-While vibecoding, you can open up new tabs to learn more about the software libraries or design approach—supporting intrinsically motivated learning.
-
-**Claude Tabs supports the flow of curiosity around the flow of work.**
+Learning Mode turns those moments of curiosity into opportunities—without breaking your flow.
 
 ---
 
-### How It Works
+## How it works
 
-With Learning Mode on, when you ask Claude to perform a task—like create some vibecoded software—Claude will highlight key technical terms and library names.
+### Learning Links
 
-**Learning Links** highlight relevant concepts for further learning. Clicking those links opens a new tab that explains the concept in depth.
+Key concepts get highlighted as you work. Click any link to open a quick explanation in a new tab. You get an instant summary, then the full context streams in while you keep going.
 
-Learning links provide immediate curiosity satisfaction without disrupting the flow of the main task.
+### Deep Dives
 
----
+Highlight any text and click "Deep Dive" to explore it further. Go as deep as you want in a side tab—your main conversation stays focused.
 
-### Text Selection Deep Dive
+### Side Tabs
 
-You can also highlight any text to "Learn More"—so you can dive deep on anything in a side conversation.
+Tabs keep your explorations organized alongside your work. They know what you're working on, but they don't clutter your main conversation. Think of them as scratch space for curiosity.
 
----
+### Your Learner Profile
 
-### Keyboard Shortcuts
-
-- **Opt + ←/→**: Navigate between tabs
-- **Opt + ↑**: Open new learning tab
-- **Opt + ↓**: Close current tab (if not main)
+Tell Claude what you're learning and what you already know. Explanations adapt to meet you where you are—not too basic, not too advanced.
 
 ---
 
-**Keep Learning.**`
+## Why use it
+
+**Stay in flow.** Explore questions without derailing your work.
+
+**Use the wait.** Learn something while code generates.
+
+**Build understanding.** Don't just get answers—get why.
+
+**Keep it clean.** Side conversations stay separate from your main context.`
   };
 
   // --- Handlers ---

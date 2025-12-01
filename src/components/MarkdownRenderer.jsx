@@ -119,7 +119,7 @@ const LearningChip = memo(({ term }) => {
   );
 });
 
-// Process text with learning links [[term::definition]] and legacy %%term%% chips
+// Process text with learning links [[term]] or [[term::definition]] and legacy %%term%% chips
 // Note: Components use data attributes for event delegation, so no onClick is passed
 const processChips = (text) => {
   if (typeof text !== 'string') return text;
@@ -129,20 +129,25 @@ const processChips = (text) => {
   const parts = text.split(/(\[\[[\s\S]+?\]\]|%%[^%]+%%)/g);
 
   return parts.map((part, i) => {
-    // New syntax: [[term::definition]]
+    // New syntax: [[term]] or [[term::definition]]
     if (part.startsWith('[[') && part.endsWith(']]')) {
       const inner = part.slice(2, -2); // Remove [[ and ]]
       const separatorIndex = inner.indexOf('::');
       if (separatorIndex > 0) {
+        // Has definition: [[term::definition]]
         const term = inner.slice(0, separatorIndex).trim();
         const definition = inner.slice(separatorIndex + 2).trim();
-        // Only create link if we have both term and definition
-        if (term && definition) {
-          // Use term as key for stable identity during re-renders
+        if (term) {
           return <LearningLink key={`link-${term}-${i}`} term={term} definition={definition} />;
         }
+      } else {
+        // Simple format: [[term]]
+        const term = inner.trim();
+        if (term) {
+          return <LearningLink key={`link-${term}-${i}`} term={term} definition="" />;
+        }
       }
-      // If no valid :: separator, just return the text without brackets
+      // Fallback: return inner text
       return inner;
     }
     // Legacy syntax: %%term%%

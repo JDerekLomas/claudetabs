@@ -155,31 +155,26 @@ export default function ClaudeLearningPrototype() {
 
 YOUR PRIMARY GOAL: Complete the user's task effectively. Learning support is secondary.
 
-LEARNER CONTEXT (for reference):
-${userProfile}
-
 ---
 
 RESPONSE APPROACH:
 
 1. Focus on solving the user's problem directly and efficiently.
 
-2. While explaining your approach, include 2-4 learning links for specialized terms, library names, or technical concepts. Format: [[term::50-100 word explanation]]
+2. While explaining, include 2-4 learning links for specialized terms or library names: [[term]]
 
 3. For coding tasks: Brief explanation with learning links FIRST, then code.
 
 ---
 
-LEARNING LINKS - What to highlight:
-- Library/framework names (React, Tailwind, Vite, etc.)
-- Technical terms the user may want to explore (hooks, closures, middleware)
-- Design patterns or architectural concepts
-- APIs, protocols, or standards
+LEARNING LINKS - Format: [[term]]
 
-Format: [[term::substantial explanation that satisfies initial curiosity]]
+What to highlight:
+- Library/framework names (e.g., [[React]], [[Tailwind]], [[Vite]])
+- Technical terms (e.g., [[hooks]], [[closures]], [[middleware]])
+- Design patterns or concepts (e.g., [[component composition]], [[state management]])
 
-Example:
-- [[Framer Motion::A production-ready animation library for React that makes complex animations simple. It uses a declarative approach where you describe what you want (initial state, animate to, exit state) and it handles the physics and timing. Popular for page transitions, gesture-based interactions, and layout animations.]]
+Just use [[term]] - no definition needed. The Deep Dive tab will explain it.
 
 ---
 
@@ -196,22 +191,24 @@ Constraints: No localStorage, no external APIs, no require()
 Design: Modern aesthetics with gradients, shadows, animations.`;
   };
 
-  const getDeepDiveSystemPrompt = (term) => {
+  const getDeepDiveSystemPrompt = (term, chatContext = '') => {
     return `You are Claude explaining "${term}" in a focused Deep Dive sidebar.
 
 CONCEPT: "${term}"
 
-YOUR TASK (80% concept, 20% personalization):
+${chatContext ? `CONTEXT FROM MAIN CHAT (to disambiguate meaning):
+${chatContext}
+
+---
+
+` : ''}YOUR TASK:
 1. Explain "${term}" clearly and thoroughly - what it is, how it works, why it matters
-2. Focus on the concept itself, not the learner's interests
-3. Include 2-3 learning links for related technical concepts: [[term::50-word explanation]]
-4. Use code examples if they help clarify (use proper fenced code blocks)
+2. Focus on the concept itself (80%), with light personalization (20%)
+3. Include 2-3 learning links for related concepts: [[term]]
+4. Use code examples if they help clarify
 5. End with: RELATED: Term 1, Term 2, Term 3
 
-LEARNER CONTEXT (use sparingly - just to calibrate depth/examples):
-${userProfile}
-
-Be direct and informative. This is a reference explanation, not a personalized lesson.`;
+Be direct and informative. This is a reference explanation.`;
   };
 
   const getSideChatSystemPrompt = (topic) => {
@@ -316,12 +313,18 @@ YOUR BEHAVIOR:
   // --- API: Fetch Definition (Deep Dive) with Streaming ---
   const fetchConceptDataStreaming = async (term, tabId) => {
     try {
+      // Build chat context summary (last few messages to disambiguate terms)
+      const recentMessages = messages.slice(-4); // Last 4 messages
+      const chatContext = recentMessages.length > 0
+        ? recentMessages.map(m => `${m.role === 'user' ? 'User' : 'Claude'}: ${m.text.slice(0, 200)}${m.text.length > 200 ? '...' : ''}`).join('\n')
+        : '';
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001', // Haiku for side conversations
-          system: getDeepDiveSystemPrompt(term),
+          system: getDeepDiveSystemPrompt(term, chatContext),
           messages: [{
             role: 'user',
             content: `Explain "${term}" to me.`

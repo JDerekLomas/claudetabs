@@ -30,7 +30,7 @@ export default async function handler(req) {
     // Build request options
     const requestOptions = {
       model: model,
-      max_tokens: 4096,
+      max_tokens: 8192,
       messages: messages,
     };
 

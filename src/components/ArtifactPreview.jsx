@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   SandpackProvider,
   SandpackLayout,
@@ -85,6 +85,31 @@ export default function ArtifactPreview({
   const [view, setView] = useState('preview'); // 'preview' | 'code' | 'split'
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [key, setKey] = useState(0); // For forcing re-render
+  const [sandpackHeight, setSandpackHeight] = useState(400); // Default height
+  const containerRef = useRef(null);
+
+  // Measure available height for Sandpack
+  useEffect(() => {
+    const updateHeight = () => {
+      if (containerRef.current) {
+        const containerHeight = containerRef.current.clientHeight;
+        const headerHeight = 40; // ArtifactPreview header
+        const availableHeight = containerHeight - headerHeight;
+        setSandpackHeight(Math.max(availableHeight, 200)); // Minimum 200px
+      }
+    };
+
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+
+    // Also update after a short delay to catch layout changes
+    const timeout = setTimeout(updateHeight, 100);
+
+    return () => {
+      window.removeEventListener('resize', updateHeight);
+      clearTimeout(timeout);
+    };
+  }, [isFullscreen]);
 
   const wrappedCode = wrapCode(code, language);
 
@@ -111,7 +136,7 @@ body {
     : 'h-full flex flex-col rounded-xl overflow-hidden border border-[#E6E4DD] shadow-lg bg-white';
 
   return (
-    <div className={containerClass}>
+    <div ref={containerRef} className={containerClass}>
       {/* Header */}
       <div className="flex items-center justify-between bg-[#1C1C1A] px-4 py-2 text-white">
         <div className="flex items-center gap-3">
@@ -189,10 +214,8 @@ body {
         </div>
       </div>
 
-      {/* Sandpack - use explicit viewport height calculation
-           Header: 48px, Tab bar: 56px, ArtifactPreview header: 40px = 144px total
-           When fullscreen, only ArtifactPreview header exists = 40px */}
-      <div style={{ height: isFullscreen ? 'calc(100vh - 40px)' : 'calc(100vh - 160px)' }}>
+      {/* Sandpack - use measured height in pixels for reliable iframe sizing */}
+      <div style={{ height: `${sandpackHeight}px`, flexShrink: 0 }}>
         <SandpackProvider
           key={key}
           template="react"
@@ -209,14 +232,14 @@ body {
         >
           <SandpackLayout
             style={{
-              height: '100%',
+              height: `${sandpackHeight}px`,
               border: 'none',
             }}
           >
             {(view === 'code' || view === 'split') && (
               <SandpackCodeEditor
                 style={{
-                  height: '100%',
+                  height: `${sandpackHeight}px`,
                   flex: view === 'split' ? 1 : 2,
                 }}
                 showLineNumbers
@@ -226,7 +249,7 @@ body {
             {(view === 'preview' || view === 'split') && (
               <SandpackPreview
                 style={{
-                  height: '100%',
+                  height: `${sandpackHeight}px`,
                   flex: 1,
                 }}
                 showOpenInCodeSandbox={false}

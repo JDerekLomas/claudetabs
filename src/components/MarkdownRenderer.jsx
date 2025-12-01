@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -82,13 +82,13 @@ const CodeBlock = ({ language, children, isArtifact, onRunArtifact }) => {
 
 // Learning link component (for [[term::definition]] syntax)
 // Clicking opens a Deep Dive tab with the definition as the initial summary
-const LearningLink = ({ term, definition, onClick }) => {
+// Uses data attributes for event delegation to avoid stale closure issues
+const LearningLink = memo(({ term, definition }) => {
   return (
     <span
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick(term, definition);
-      }}
+      data-learning-link="true"
+      data-term={term}
+      data-definition={definition}
       className="inline-block border-b-2 cursor-pointer transition-all duration-200 hover:bg-orange-100 mx-[1px] px-[2px] rounded-[2px]"
       style={{
         borderColor: 'rgba(217, 119, 87, 0.4)',
@@ -98,27 +98,30 @@ const LearningLink = ({ term, definition, onClick }) => {
       {term}
     </span>
   );
-};
+});
 
 // Legacy learning chip component (for %%term%% syntax - backwards compatibility)
-const LearningChip = ({ term, onClick }) => (
-  <span
-    onClick={(e) => {
-      e.stopPropagation();
-      onClick(term);
-    }}
-    className="inline-block border-b-2 cursor-pointer transition-all duration-200 hover:bg-orange-100 mx-[1px] px-[2px] rounded-[2px]"
-    style={{
-      borderColor: 'rgba(217, 119, 87, 0.4)',
-      backgroundColor: 'rgba(217, 119, 87, 0.15)',
-    }}
-  >
-    {term}
-  </span>
-);
+// Uses data attributes for event delegation to avoid stale closure issues
+const LearningChip = memo(({ term }) => {
+  return (
+    <span
+      data-learning-link="true"
+      data-term={term}
+      data-definition=""
+      className="inline-block border-b-2 cursor-pointer transition-all duration-200 hover:bg-orange-100 mx-[1px] px-[2px] rounded-[2px]"
+      style={{
+        borderColor: 'rgba(217, 119, 87, 0.4)',
+        backgroundColor: 'rgba(217, 119, 87, 0.15)',
+      }}
+    >
+      {term}
+    </span>
+  );
+});
 
 // Process text with learning links [[term::definition]] and legacy %%term%% chips
-const processChips = (text, onChipClick) => {
+// Note: Components use data attributes for event delegation, so no onClick is passed
+const processChips = (text) => {
   if (typeof text !== 'string') return text;
 
   // Split on [[...]] or %%...%% patterns
@@ -135,7 +138,8 @@ const processChips = (text, onChipClick) => {
         const definition = inner.slice(separatorIndex + 2).trim();
         // Only create link if we have both term and definition
         if (term && definition) {
-          return <LearningLink key={i} term={term} definition={definition} onClick={onChipClick} />;
+          // Use term as key for stable identity during re-renders
+          return <LearningLink key={`link-${term}-${i}`} term={term} definition={definition} />;
         }
       }
       // If no valid :: separator, just return the text without brackets
@@ -144,7 +148,7 @@ const processChips = (text, onChipClick) => {
     // Legacy syntax: %%term%%
     if (part.startsWith('%%') && part.endsWith('%%')) {
       const term = part.slice(2, -2);
-      return <LearningChip key={i} term={term} onClick={onChipClick} />;
+      return <LearningChip key={`chip-${term}-${i}`} term={term} />;
     }
     return part;
   });
@@ -157,11 +161,42 @@ export default function MarkdownRenderer({
   onRunArtifact,
   isSerif = true
 }) {
+  const containerRef = useRef(null);
+
   // Artifact-capable languages
   const artifactLanguages = ['jsx', 'tsx', 'react', 'html'];
 
+  // Event delegation for learning links - avoids stale closure issues during streaming
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !onChipClick) return;
+
+    const handleClick = (e) => {
+      // Find the learning link element (could be the target or an ancestor)
+      const learningLink = e.target.closest('[data-learning-link="true"]');
+      if (!learningLink) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      window.getSelection()?.removeAllRanges();
+
+      const term = learningLink.getAttribute('data-term');
+      const definition = learningLink.getAttribute('data-definition');
+
+      if (term) {
+        onChipClick(term, definition || '');
+      }
+    };
+
+    container.addEventListener('click', handleClick);
+    return () => container.removeEventListener('click', handleClick);
+  }, [onChipClick]);
+
   return (
-    <div className={`markdown-content ${isSerif ? 'font-serif' : 'font-sans'} leading-relaxed`}>
+    <div
+      ref={containerRef}
+      className={`markdown-content ${isSerif ? 'font-serif' : 'font-sans'} leading-relaxed`}
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -196,11 +231,12 @@ export default function MarkdownRenderer({
           },
 
           // Helper to process children recursively for chips
+          // Note: processChips no longer needs onChipClick - we use event delegation
           ...(() => {
             const processChildren = (children) => {
               return React.Children.map(children, (child) => {
                 if (typeof child === 'string') {
-                  return processChips(child, onChipClick);
+                  return processChips(child);
                 }
                 if (React.isValidElement(child) && child.props?.children) {
                   return React.cloneElement(child, {

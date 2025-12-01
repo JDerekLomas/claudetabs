@@ -152,57 +152,49 @@ export default function ClaudeLearningPrototype() {
       return `You are Claude, a helpful AI assistant. Respond naturally and helpfully.`;
     }
 
-    return `You are Claude in Learning Mode - an AI tutor that adapts to the learner.
+    return `You are Claude, a helpful AI assistant with Learning Mode enabled.
 
-LEARNER PROFILE:
+YOUR PRIMARY GOAL: Complete the user's task effectively. Learning support is secondary.
+
+LEARNER CONTEXT (for reference):
 ${userProfile}
 
 ---
 
-RESPONSE STRUCTURE (IMPORTANT - follow this order):
+RESPONSE APPROACH:
 
-1. **Brief intro** (1-2 sentences) - What you're going to help with
+1. Focus on solving the user's problem directly and efficiently.
 
-2. **Explanation with Learning Links** - Explain the concepts FIRST, before any code. Include 2-4 learning links formatted as [[concept::10-15 word definition]]. This gives the learner something to read while code generates.
+2. While explaining your approach, include 2-4 learning links for specialized terms, library names, or technical concepts. Format: [[term::50-100 word explanation]]
 
-3. **Code artifact** (if applicable) - Put code blocks LAST, after the explanation.
-
-4. **Optional follow-up** - One specific learning invitation like "Want to understand how [mechanism] works?"
+3. For coding tasks: Brief explanation with learning links FIRST, then code.
 
 ---
 
-LEARNING LINKS:
-Format: [[concept::50-100 word explanation]]
+LEARNING LINKS - What to highlight:
+- Library/framework names (React, Tailwind, Vite, etc.)
+- Technical terms the user may want to explore (hooks, closures, middleware)
+- Design patterns or architectural concepts
+- APIs, protocols, or standards
 
-The explanation should be substantial - enough to satisfy initial curiosity. It will display as the opening text when the user clicks to explore the concept.
+Format: [[term::substantial explanation that satisfies initial curiosity]]
 
-Examples:
-- [[useState::A React hook that lets functional components maintain state between renders. When you call useState, you get back an array with the current value and a setter function. Each time the setter is called, React re-renders the component with the new value. This is how components "remember" things like form inputs, toggle states, or counters without losing data between renders.]]
-- [[Tailwind CSS::A utility-first CSS framework that provides pre-built classes like flex, pt-4, and text-center instead of writing custom CSS. Rather than naming things like .card-container, you compose styles directly in your HTML. This approach speeds up development and keeps styles consistent, though it can make markup look busy at first.]]
-
-Choose 2-4 terms that match the learner's goals and may be unfamiliar.
+Example:
+- [[Framer Motion::A production-ready animation library for React that makes complex animations simple. It uses a declarative approach where you describe what you want (initial state, animate to, exit state) and it handles the physics and timing. Popular for page transitions, gesture-based interactions, and layout animations.]]
 
 ---
 
 REACT ARTIFACTS:
-Requirements:
 - Use \`\`\`jsx code blocks with complete components
-- Always include: \`export default function ComponentName()\`
-- Explicit hook imports: \`import { useState, useEffect } from 'react'\`
-- Use Tailwind CSS for all styling
+- Include: \`export default function ComponentName()\`
+- Explicit imports: \`import { useState, useEffect } from 'react'\`
+- Use Tailwind CSS for styling
 
-Available libraries:
-- lucide-react: \`import { Icon } from 'lucide-react'\`
-- recharts: \`import { LineChart, BarChart, ... } from 'recharts'\`
-- framer-motion: \`import { motion } from 'framer-motion'\`
-- date-fns, lodash, mathjs also available
+Available: lucide-react, recharts, framer-motion, date-fns, lodash, mathjs
 
-Constraints:
-- NO localStorage/sessionStorage
-- NO external API calls
-- NO require() - use ES6 imports
+Constraints: No localStorage, no external APIs, no require()
 
-Design: Modern aesthetics with gradients, shadows, animations, hover effects.`;
+Design: Modern aesthetics with gradients, shadows, animations.`;
   };
 
   const getDeepDiveSystemPrompt = (term) => {
@@ -290,21 +282,32 @@ YOUR BEHAVIOR:
 
   // --- Selection Handler ---
   useEffect(() => {
-    const handleSelection = () => {
-      const selection = window.getSelection();
-      if (selection && selection.toString().trim().length > 0) {
-        const range = selection.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-
-        setSelectionBox({
-          top: rect.top - 40,
-          left: rect.left + (rect.width / 2) - 50,
-        });
-        setSelectedText(selection.toString());
-      } else {
-        setSelectionBox(null);
-        setSelectedText("");
+    const handleSelection = (e) => {
+      // Don't process if clicking on a learning link or interactive element
+      if (e.target.closest('[data-learning-link]') ||
+          e.target.closest('button') ||
+          e.target.closest('a') ||
+          e.target.closest('input')) {
+        return;
       }
+
+      // Small delay to let click handlers run first
+      setTimeout(() => {
+        const selection = window.getSelection();
+        if (selection && selection.toString().trim().length > 0) {
+          const range = selection.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+
+          setSelectionBox({
+            top: rect.top - 40,
+            left: rect.left + (rect.width / 2) - 50,
+          });
+          setSelectedText(selection.toString());
+        } else {
+          setSelectionBox(null);
+          setSelectedText("");
+        }
+      }, 10);
     };
 
     document.addEventListener('mouseup', handleSelection);
@@ -318,6 +321,7 @@ YOUR BEHAVIOR:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001', // Haiku for side conversations
           system: getDeepDiveSystemPrompt(term),
           messages: [{
             role: 'user',
@@ -542,6 +546,7 @@ YOUR BEHAVIOR:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001', // Haiku for side conversations
           system: getSideChatSystemPrompt(currentTab.title),
           messages: currentTab.content.messages.map(m => ({
             role: m.role === 'ai' ? 'assistant' : m.role,
@@ -689,9 +694,14 @@ YOUR BEHAVIOR:
                   })()}, Derek
                 </h1>
                 {learningModeOn && (
-                  <div className="flex items-center gap-2 text-[#D97757] text-sm font-medium mt-2">
-                    <Sparkles size={16} />
-                    <span>Learning Mode Active</span>
+                  <div className="mt-4 text-center">
+                    <div className="flex items-center justify-center gap-2 text-[#D97757] text-sm font-medium">
+                      <Sparkles size={16} />
+                      <span>Learning Mode Active</span>
+                    </div>
+                    <p className="text-sm text-[#6B6B6B] mt-3 max-w-md mx-auto leading-relaxed">
+                      Click to explore <span className="text-[#D97757] font-medium">highlighted</span> responses in side tabs. Or highlight any text and select "Deep Dive."
+                    </p>
                   </div>
                 )}
              </div>
@@ -768,9 +778,11 @@ YOUR BEHAVIOR:
             <h1 className={`text-3xl md:text-4xl ${FONTS.serif} text-[#141413] leading-tight`}>
                 {activeTab.title}
             </h1>
+            {/* Pre-generated summary - commented out to test pure Haiku streaming
             <p className="text-sm text-gray-500 mt-2 font-serif italic border-l-2 border-[#D97757] pl-3">
                 {activeTab.content?.short}
             </p>
+            */}
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 md:p-8">
@@ -851,13 +863,26 @@ YOUR BEHAVIOR:
       style={{ backgroundColor: COLORS.bg }}
     >
       {/* Float Selection Menu */}
-      {selectionBox && (
+      {selectionBox && selectedText && (
           <div
             className="fixed z-50 animate-in fade-in zoom-in-95 duration-150"
             style={{ top: selectionBox.top, left: selectionBox.left }}
+            onMouseDown={(e) => e.preventDefault()} // Prevent losing selection
           >
               <button
-                onClick={() => handleOpenTab(selectedText)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const text = selectedText; // Capture before clearing
+                  setSelectionBox(null);
+                  setSelectedText("");
+                  window.getSelection()?.removeAllRanges();
+                  handleOpenTab(text);
+                }}
                 className="bg-[#1C1C1A] text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-xl flex items-center gap-2 hover:scale-105 transition-transform"
               >
                   <Sparkles size={12} className="text-[#D97757]" />
@@ -1078,7 +1103,6 @@ YOUR BEHAVIOR:
                 ? 'bg-orange-50 text-[#D97757]'
                 : 'hover:bg-[#EFECE6] text-[#6B6B6B]'
             }`}
-            title="Learning Mode"
           >
             <GraduationCap size={20} />
           </button>
@@ -1263,18 +1287,24 @@ YOUR BEHAVIOR:
                             <button className="p-2 hover:bg-[#EFECE6] rounded-lg transition-colors text-[#6B6B6B]" title="Settings">
                                 <Sliders size={20} />
                             </button>
-                            <button
-                                onClick={() => setLearningModeOn(!learningModeOn)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium ${
-                                  learningModeOn
-                                    ? 'text-[#D97757] bg-orange-50 hover:bg-orange-100'
-                                    : 'text-[#6B6B6B] hover:bg-[#EFECE6]'
-                                }`}
-                                title="Toggle Learning Mode"
-                            >
-                                <Sparkles size={16} />
-                                <span className="hidden sm:inline">Learning Mode</span>
-                            </button>
+                            <div className="relative group">
+                                <button
+                                    onClick={() => setLearningModeOn(!learningModeOn)}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium ${
+                                      learningModeOn
+                                        ? 'text-[#D97757] bg-orange-50 hover:bg-orange-100'
+                                        : 'text-[#6B6B6B] hover:bg-[#EFECE6]'
+                                    }`}
+                                >
+                                    <Sparkles size={16} />
+                                    <span className="hidden sm:inline">Learning Mode</span>
+                                </button>
+                                {/* Tooltip */}
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-[#1C1C1A] text-white text-xs rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 whitespace-nowrap">
+                                    {learningModeOn ? 'Disable' : 'Enable'} Learning Mode
+                                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full border-6 border-transparent border-t-[#1C1C1A]" />
+                                </div>
+                            </div>
                         </div>
                         <div className="flex items-center gap-2">
                             <button className="flex items-center gap-1 px-2 py-1 text-sm text-[#6B6B6B] hover:bg-[#EFECE6] rounded-lg transition-colors">

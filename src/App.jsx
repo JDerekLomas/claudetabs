@@ -84,27 +84,28 @@ export default function ClaudeLearningPrototype() {
   const DEFAULT_TABS = [{ id: 'main', title: 'New Chat', type: 'chat', content: null }];
 
   // Chat Data State - store messages AND tabs per chat
+  // IDs use timestamps for proper sorting (newest first)
   const [chats, setChats] = useState({
-    'chat-1': {
+    'chat-1733000003': {
       title: 'Help me build a marble run in three.js',
       messages: DEFAULT_CHAT.messages,
       tabs: [{ id: 'main', title: 'Help me build a marble run in three.js', type: 'chat', content: null }],
       activeTabId: 'main'
     },
-    'chat-2': {
+    'chat-1733000002': {
       title: 'Understanding Redux Middleware',
       messages: [],
       tabs: [{ id: 'main', title: 'Understanding Redux Middleware', type: 'chat', content: null }],
       activeTabId: 'main'
     },
-    'chat-3': {
+    'chat-1733000001': {
       title: 'CSS Grid Layouts',
       messages: [],
       tabs: [{ id: 'main', title: 'CSS Grid Layouts', type: 'chat', content: null }],
       activeTabId: 'main'
     }
   });
-  const [activeChatId, setActiveChatId] = useState('chat-1');
+  const [activeChatId, setActiveChatId] = useState('chat-1733000003');
 
   // Ref to always have access to the latest activeChatId (prevents stale closures)
   const activeChatIdRef = useRef(activeChatId);
@@ -1415,18 +1416,6 @@ Toggle Learning Mode in settings. Click a highlighted concept. Follow your curio
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative transition-all duration-300">
-          {/* Header with conversation title */}
-          <header className="h-12 flex items-center justify-between px-4 bg-[#FAF9F6] shrink-0 z-10">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-[#2D2D2A]">
-                    {tabs.find(t => t.id === activeTabId)?.title || 'New Chat'}
-                  </span>
-                  <ChevronDown size={16} className="text-[#6B6B6B]" />
-                </div>
-                <button className="px-3 py-1.5 text-sm font-medium text-[#2D2D2A] hover:bg-[#EFECE6] rounded-lg transition-colors">
-                  Share
-                </button>
-          </header>
 
           <main className="flex-1 flex overflow-hidden relative bg-[#FAF9F6]">
             {renderActiveTabContent()}

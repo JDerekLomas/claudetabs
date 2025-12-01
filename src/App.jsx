@@ -8,7 +8,6 @@ import {
   Sparkles,
   Loader2,
   Plus,
-  Save,
   Keyboard,
   Search,
   Code,
@@ -70,6 +69,7 @@ export default function ClaudeLearningPrototype() {
   // UI State
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('profile'); // 'profile' | 'prompts'
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [learningModeOn, setLearningModeOn] = useState(true);
 
@@ -156,17 +156,18 @@ export default function ClaudeLearningPrototype() {
       return `You are Claude, a helpful AI assistant. Respond naturally and helpfully.`;
     }
 
-    return `You are Claude, a helpful AI assistant with Learning Mode enabled.
+    return `You are Claude, a helpful AI assistant with Learning Mode enabled. Your goal is to help the user complete their task while supporting their learning.
 
-YOUR PRIMARY GOAL: Complete the user's task effectively. Learning support is secondary.
+LEARNER PROFILE:
+${userProfile}
 
 ---
 
 RESPONSE APPROACH:
 
-1. Focus on solving the user's problem directly and efficiently.
+1. Complete the user's task effectively.
 
-2. While explaining, include 2-4 learning links for specialized terms or library names: [[term]]
+2. Include 2-4 learning links [[term]] weighted toward the learner's interests and goals above. If they want to understand React deeply, highlight React concepts. If they're learning about databases, highlight those patterns.
 
 3. For coding tasks: Brief explanation with learning links FIRST, then code.
 
@@ -174,12 +175,14 @@ RESPONSE APPROACH:
 
 LEARNING LINKS - Format: [[term]]
 
-What to highlight:
-- Library/framework names (e.g., [[React]], [[Tailwind]], [[Vite]])
-- Technical terms (e.g., [[hooks]], [[closures]], [[middleware]])
-- Design patterns or concepts (e.g., [[component composition]], [[state management]])
+Prioritize terms that match the learner's stated interests:
+- Concepts they said they want to learn
+- Foundational ideas for their learning goals
+- Patterns and techniques in their focus areas
 
-Just use [[term]] - no definition needed. The Deep Dive tab will explain it.
+Also include:
+- Library/framework names relevant to the task
+- Technical terms that appear in the code
 
 ---
 
@@ -191,9 +194,7 @@ REACT ARTIFACTS:
 
 Available: lucide-react, recharts, framer-motion, date-fns, lodash, mathjs
 
-Constraints: No localStorage, no external APIs, no require()
-
-Design: Modern aesthetics with gradients, shadows, animations.`;
+Constraints: No localStorage, no external APIs, no require()`;
   };
 
   const getDeepDiveSystemPrompt = (term, chatContext = '') => {
@@ -632,41 +633,27 @@ YOUR BEHAVIOR:
   const STATIC_PAGES = {
     'Learning Mode': `**Learn while you build.**
 
-When you're working with Claude, questions come up. What's that library? Why that approach? What does this pattern actually do?
+**Learning Links** — Highlighted concepts open quick explanations in new tabs. Instant summary first, full context streams in while you keep working.
 
-Learning Mode turns those moments of curiosity into opportunities—without breaking your flow.
+**Deep Dives** — Highlight any text, click "Deep Dive," explore in a side tab. Your main conversation stays focused.
 
----
+**Side Tabs** — Scratch space for curiosity. They know your context but don't clutter your main chat.
 
-## How it works
-
-### Learning Links
-
-Key concepts get highlighted as you work. Click any link to open a quick explanation in a new tab. You get an instant summary, then the full context streams in while you keep going.
-
-### Deep Dives
-
-Highlight any text and click "Deep Dive" to explore it further. Go as deep as you want in a side tab—your main conversation stays focused.
-
-### Side Tabs
-
-Tabs keep your explorations organized alongside your work. They know what you're working on, but they don't clutter your main conversation. Think of them as scratch space for curiosity.
-
-### Your Learner Profile
-
-Tell Claude what you're learning and what you already know. Explanations adapt to meet you where you are—not too basic, not too advanced.
+**Learner Profile** — Tell Claude what you're learning. Explanations adapt to meet you where you are.
 
 ---
 
-## Why use it
+## Keyboard shortcuts
 
-**Stay in flow.** Explore questions without derailing your work.
+| Shortcut | Action |
+|----------|--------|
+| **Opt + ← / →** | Switch tabs |
+| **Opt + ↑** | New learning tab |
+| **Opt + ↓** | Close tab |
 
-**Use the wait.** Learn something while code generates.
+---
 
-**Build understanding.** Don't just get answers—get why.
-
-**Keep it clean.** Side conversations stay separate from your main context.`
+Toggle Learning Mode in settings. Click a highlighted concept. Follow your curiosity.`
   };
 
   // --- Handlers ---
@@ -1025,113 +1012,165 @@ Tell Claude what you're learning and what you already know. Explanations adapt t
         </div>
       )}
 
-      {/* Learning Profile Modal */}
+      {/* Settings Modal with Tabs */}
       {settingsOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSettingsOpen(false)} />
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg relative z-10 overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-                {/* Header */}
-                <div className="p-6 border-b border-[#E6E4DD] bg-[#FAF9F6]">
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <div className="flex items-center gap-2 text-[#D97757] mb-1">
-                                <GraduationCap size={20} />
-                                <span className="text-sm font-medium uppercase tracking-wide">Learning Mode</span>
-                            </div>
-                            <h3 className="font-serif text-2xl font-bold text-[#141413]">Your Learning Profile</h3>
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+                {/* Header with Tabs */}
+                <div className="border-b border-[#E6E4DD] bg-[#FAF9F6]">
+                    <div className="p-4 pb-0 flex justify-between items-start">
+                        <div className="flex items-center gap-2 text-[#D97757]">
+                            <GraduationCap size={20} />
+                            <span className="text-sm font-medium uppercase tracking-wide">Settings</span>
                         </div>
                         <button onClick={() => setSettingsOpen(false)} className="p-1.5 hover:bg-[#EFECE6] rounded-lg transition-colors">
                             <X size={20} className="text-[#6B6B6B]" />
                         </button>
                     </div>
-                    <p className="text-sm text-[#6B6B6B] mt-2">
-                        Help Claude understand your background so it can personalize explanations and highlight relevant concepts for you.
-                    </p>
+                    <div className="flex gap-1 px-4 mt-3">
+                        <button
+                            onClick={() => setSettingsTab('profile')}
+                            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                                settingsTab === 'profile'
+                                    ? 'bg-white text-[#D97757] border-t border-l border-r border-[#E6E4DD]'
+                                    : 'text-[#6B6B6B] hover:text-[#2D2D2A]'
+                            }`}
+                        >
+                            Learner Profile
+                        </button>
+                        <button
+                            onClick={() => setSettingsTab('prompts')}
+                            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                                settingsTab === 'prompts'
+                                    ? 'bg-white text-[#D97757] border-t border-l border-r border-[#E6E4DD]'
+                                    : 'text-[#6B6B6B] hover:text-[#2D2D2A]'
+                            }`}
+                        >
+                            System Prompts
+                        </button>
+                    </div>
                 </div>
 
-                {/* Toggle */}
-                <div className="px-6 py-4 border-b border-[#E6E4DD] flex items-center justify-between">
-                    <div>
-                        <div className="font-medium text-[#2D2D2A]">Enable Learning Mode</div>
-                        <div className="text-sm text-[#6B6B6B]">Highlight concepts and adapt explanations</div>
-                    </div>
-                    <button
-                        onClick={() => setLearningModeOn(!learningModeOn)}
-                        className={`relative w-12 h-7 rounded-full transition-colors ${
-                            learningModeOn ? 'bg-[#D97757]' : 'bg-[#E6E4DD]'
-                        }`}
-                    >
-                        <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                            learningModeOn ? 'translate-x-6' : 'translate-x-1'
-                        }`} />
-                    </button>
-                </div>
+                {/* Tab Content */}
+                <div className="flex-1 overflow-y-auto">
+                    {settingsTab === 'profile' && (
+                        <>
+                            {/* Toggle */}
+                            <div className="px-6 py-4 border-b border-[#E6E4DD] flex items-center justify-between">
+                                <div>
+                                    <div className="font-medium text-[#2D2D2A]">Enable Learning Mode</div>
+                                    <div className="text-sm text-[#6B6B6B]">Highlight concepts and adapt explanations</div>
+                                </div>
+                                <button
+                                    onClick={() => setLearningModeOn(!learningModeOn)}
+                                    className={`relative w-12 h-7 rounded-full transition-colors ${
+                                        learningModeOn ? 'bg-[#D97757]' : 'bg-[#E6E4DD]'
+                                    }`}
+                                >
+                                    <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                                        learningModeOn ? 'translate-x-6' : 'translate-x-1'
+                                    }`} />
+                                </button>
+                            </div>
 
-                {/* Form */}
-                <div className="p-6 space-y-5">
-                    {/* Background */}
-                    <div>
-                        <label className="flex items-center gap-2 text-sm font-medium text-[#2D2D2A] mb-2">
-                            <User size={16} className="text-[#D97757]" />
-                            Your Background
-                        </label>
-                        <textarea
-                            placeholder="e.g., I'm a frontend developer with 3 years of experience. I know React and TypeScript well, but I'm new to 3D graphics..."
-                            value={userProfile.split('|||')[0] || ''}
-                            onChange={(e) => {
-                                const parts = userProfile.split('|||');
-                                setUserProfile([e.target.value, parts[1] || '', parts[2] || ''].join('|||'));
-                            }}
-                            className="w-full h-24 p-3 rounded-lg border border-[#E6E4DD] bg-[#FAF9F6] text-[#2D2D2A] placeholder:text-[#9B9B9B] focus:outline-none focus:ring-2 focus:ring-[#D97757] resize-none text-sm"
-                        />
-                    </div>
+                            {/* Form */}
+                            <div className="p-6 space-y-5">
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm font-medium text-[#2D2D2A] mb-2">
+                                        <User size={16} className="text-[#D97757]" />
+                                        Your Background
+                                    </label>
+                                    <textarea
+                                        placeholder="e.g., I'm a frontend developer with 3 years of experience..."
+                                        value={userProfile.split('|||')[0] || ''}
+                                        onChange={(e) => {
+                                            const parts = userProfile.split('|||');
+                                            setUserProfile([e.target.value, parts[1] || '', parts[2] || ''].join('|||'));
+                                        }}
+                                        className="w-full h-20 p-3 rounded-lg border border-[#E6E4DD] bg-[#FAF9F6] text-[#2D2D2A] placeholder:text-[#9B9B9B] focus:outline-none focus:ring-2 focus:ring-[#D97757] resize-none text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm font-medium text-[#2D2D2A] mb-2">
+                                        <Lightbulb size={16} className="text-[#D97757]" />
+                                        Aspirations
+                                    </label>
+                                    <textarea
+                                        placeholder="e.g., I want to build my own indie games..."
+                                        value={userProfile.split('|||')[1] || ''}
+                                        onChange={(e) => {
+                                            const parts = userProfile.split('|||');
+                                            setUserProfile([parts[0] || '', e.target.value, parts[2] || ''].join('|||'));
+                                        }}
+                                        className="w-full h-20 p-3 rounded-lg border border-[#E6E4DD] bg-[#FAF9F6] text-[#2D2D2A] placeholder:text-[#9B9B9B] focus:outline-none focus:ring-2 focus:ring-[#D97757] resize-none text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm font-medium text-[#2D2D2A] mb-2">
+                                        <Target size={16} className="text-[#D97757]" />
+                                        Learning Goals
+                                    </label>
+                                    <textarea
+                                        placeholder="e.g., I want to understand React more deeply..."
+                                        value={userProfile.split('|||')[2] || ''}
+                                        onChange={(e) => {
+                                            const parts = userProfile.split('|||');
+                                            setUserProfile([parts[0] || '', parts[1] || '', e.target.value].join('|||'));
+                                        }}
+                                        className="w-full h-20 p-3 rounded-lg border border-[#E6E4DD] bg-[#FAF9F6] text-[#2D2D2A] placeholder:text-[#9B9B9B] focus:outline-none focus:ring-2 focus:ring-[#D97757] resize-none text-sm"
+                                    />
+                                </div>
+                            </div>
+                        </>
+                    )}
 
-                    {/* Aspirations */}
-                    <div>
-                        <label className="flex items-center gap-2 text-sm font-medium text-[#2D2D2A] mb-2">
-                            <Lightbulb size={16} className="text-[#D97757]" />
-                            Aspirations
-                        </label>
-                        <textarea
-                            placeholder="e.g., I want to build my own indie games, create interactive art installations, or work at a game studio..."
-                            value={userProfile.split('|||')[1] || ''}
-                            onChange={(e) => {
-                                const parts = userProfile.split('|||');
-                                setUserProfile([parts[0] || '', e.target.value, parts[2] || ''].join('|||'));
-                            }}
-                            className="w-full h-24 p-3 rounded-lg border border-[#E6E4DD] bg-[#FAF9F6] text-[#2D2D2A] placeholder:text-[#9B9B9B] focus:outline-none focus:ring-2 focus:ring-[#D97757] resize-none text-sm"
-                        />
-                    </div>
+                    {settingsTab === 'prompts' && (
+                        <div className="p-6 space-y-6">
+                            <p className="text-sm text-[#6B6B6B]">
+                                These are the system prompts used by Learning Mode. They're shown here for transparency.
+                            </p>
 
-                    {/* Learning Goals */}
-                    <div>
-                        <label className="flex items-center gap-2 text-sm font-medium text-[#2D2D2A] mb-2">
-                            <Target size={16} className="text-[#D97757]" />
-                            Learning Goals
-                        </label>
-                        <textarea
-                            placeholder="e.g., I want to understand game physics, learn Three.js, and build interactive 3D experiences..."
-                            value={userProfile.split('|||')[2] || ''}
-                            onChange={(e) => {
-                                const parts = userProfile.split('|||');
-                                setUserProfile([parts[0] || '', parts[1] || '', e.target.value].join('|||'));
-                            }}
-                            className="w-full h-24 p-3 rounded-lg border border-[#E6E4DD] bg-[#FAF9F6] text-[#2D2D2A] placeholder:text-[#9B9B9B] focus:outline-none focus:ring-2 focus:ring-[#D97757] resize-none text-sm"
-                        />
-                    </div>
+                            {/* Main Chat Prompt */}
+                            <div>
+                                <label className="text-sm font-medium text-[#2D2D2A] mb-2 block">
+                                    Main Chat (Learning Mode)
+                                </label>
+                                <div className="p-3 rounded-lg border border-[#E6E4DD] bg-[#FAF9F6] text-xs font-mono text-[#6B6B6B] max-h-48 overflow-y-auto whitespace-pre-wrap">
+                                    {getMainChatSystemPrompt()}
+                                </div>
+                            </div>
+
+                            {/* Deep Dive Prompt */}
+                            <div>
+                                <label className="text-sm font-medium text-[#2D2D2A] mb-2 block">
+                                    Deep Dive Tab
+                                </label>
+                                <div className="p-3 rounded-lg border border-[#E6E4DD] bg-[#FAF9F6] text-xs font-mono text-[#6B6B6B] max-h-48 overflow-y-auto whitespace-pre-wrap">
+                                    {getDeepDiveSystemPrompt('[concept]', '[chat context]')}
+                                </div>
+                            </div>
+
+                            {/* Side Chat Prompt */}
+                            <div>
+                                <label className="text-sm font-medium text-[#2D2D2A] mb-2 block">
+                                    Side Conversation
+                                </label>
+                                <div className="p-3 rounded-lg border border-[#E6E4DD] bg-[#FAF9F6] text-xs font-mono text-[#6B6B6B] max-h-48 overflow-y-auto whitespace-pre-wrap">
+                                    {getSideChatSystemPrompt('[topic]')}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-[#E6E4DD] bg-[#FAF9F6] flex justify-between items-center">
-                    <p className="text-xs text-[#9B9B9B]">
-                        Your profile is stored locally and used to personalize Claude's responses.
-                    </p>
+                <div className="p-4 border-t border-[#E6E4DD] bg-[#FAF9F6] flex justify-end">
                     <button
                         onClick={() => setSettingsOpen(false)}
                         className="flex items-center gap-2 px-5 py-2 bg-[#D97757] hover:bg-[#C06345] text-white rounded-lg font-medium transition-colors text-sm"
                     >
-                        <Save size={16} />
-                        Save Profile
+                        Done
                     </button>
                 </div>
             </div>
@@ -1370,11 +1409,6 @@ Tell Claude what you're learning and what you already know. Explanations adapt t
                                     <Sparkles size={16} />
                                     <span className="hidden sm:inline">Learning Mode</span>
                                 </button>
-                                {/* Tooltip */}
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-[#1C1C1A] text-white text-xs rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 whitespace-nowrap">
-                                    {learningModeOn ? 'Disable' : 'Enable'} Learning Mode
-                                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full border-6 border-transparent border-t-[#1C1C1A]" />
-                                </div>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">

@@ -27,7 +27,9 @@ import {
   User,
   Target,
   Lightbulb,
-  History
+  History,
+  Globe,
+  ExternalLink
 } from 'lucide-react';
 import MarkdownRenderer from './components/MarkdownRenderer';
 import ArtifactPreview from './components/ArtifactPreview';
@@ -359,6 +361,11 @@ export default function ClaudeLearningPrototype() {
     cacheRead: 0,
     lastRequest: null
   });
+
+  // Web search state
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchSources, setSearchSources] = useState([]);
 
   // Concept cache for Deep Dive tab summaries
   const [conceptCache, setConceptCache] = useState(DEFAULT_PRELOADED_SUMMARIES);
@@ -716,6 +723,8 @@ YOUR BEHAVIOR:
     setMessages(prev => [...prev, userMsg]);
     setInputText("");
     setIsTyping(true);
+    setSearchSources([]); // Clear previous sources
+    setIsSearching(false);
 
     if (activeTabId !== 'main') setActiveTabId('main');
 
@@ -727,6 +736,7 @@ YOUR BEHAVIOR:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           system: getMainChatSystemPrompt(),
+          webSearch: webSearchEnabled,
           messages: messages.map(m => ({
             role: m.role === 'ai' ? 'assistant' : m.role,
             content: m.text
@@ -763,6 +773,15 @@ YOUR BEHAVIOR:
                 setMessages(prev => prev.map(m =>
                   m.id === aiMsgId ? { ...m, text: fullText } : m
                 ));
+              }
+              // Capture searching indicator
+              if (parsed.searching) {
+                setIsSearching(true);
+              }
+              // Capture search sources
+              if (parsed.sources) {
+                setSearchSources(parsed.sources);
+                setIsSearching(false);
               }
               // Capture token usage
               if (parsed.usage) {
@@ -1089,13 +1108,52 @@ Toggle Learning Mode in settings. Click a highlighted concept. Follow your curio
                </div>
              </div>
           ))}
-          {isTyping && (
+          {isSearching && (
+            <div className="flex justify-start mb-4">
+               <div className="bg-blue-50 text-blue-700 rounded-2xl px-4 py-2 border border-blue-100 flex items-center gap-2 text-sm">
+                  <Globe size={16} className="animate-pulse" />
+                  <span>Searching the web...</span>
+               </div>
+            </div>
+          )}
+          {isTyping && !isSearching && (
             <div className="flex justify-start mb-8">
                <div className="bg-white rounded-2xl p-4 border border-[#E6E4DD] flex gap-2">
                   <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
                   <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-75" style={{ animationDelay: '75ms' }} />
                   <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150" style={{ animationDelay: '150ms' }} />
                </div>
+            </div>
+          )}
+          {searchSources.length > 0 && !isTyping && (
+            <div className="mb-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
+              <div className="flex items-center gap-2 text-blue-700 text-sm font-medium mb-3">
+                <Globe size={14} />
+                <span>Sources ({searchSources.length})</span>
+              </div>
+              <div className="space-y-2">
+                {searchSources.slice(0, 5).map((source, idx) => (
+                  <a
+                    key={idx}
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-start gap-2 p-2 bg-white rounded-lg hover:bg-gray-50 transition-colors group"
+                  >
+                    <ExternalLink size={14} className="text-blue-500 mt-0.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600">
+                        {source.title || 'Source'}
+                      </div>
+                      {source.snippet && source.snippet !== '[encrypted]' && (
+                        <div className="text-xs text-gray-500 line-clamp-2 mt-0.5">
+                          {source.snippet}
+                        </div>
+                      )}
+                    </div>
+                  </a>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -1677,6 +1735,18 @@ Toggle Learning Mode in settings. Click a highlighted concept. Follow your curio
                             </button>
                             <button className="p-2 hover:bg-[#EFECE6] rounded-lg transition-colors text-[#6B6B6B]" title="Settings">
                                 <Sliders size={20} />
+                            </button>
+                            <button
+                                onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium ${
+                                  webSearchEnabled
+                                    ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+                                    : 'text-[#6B6B6B] hover:bg-[#EFECE6]'
+                                }`}
+                                title="Enable web search for current information"
+                            >
+                                <Globe size={16} />
+                                <span className="hidden sm:inline">Search</span>
                             </button>
                             <div className="relative group">
                                 <button

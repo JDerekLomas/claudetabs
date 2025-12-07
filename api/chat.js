@@ -13,7 +13,7 @@ export default async function handler(req) {
   }
 
   try {
-    const { messages, system, model = 'claude-sonnet-4-5-20250929' } = await req.json();
+    const { messages, system, model = 'claude-sonnet-4-5-20250929', webSearch = false } = await req.json();
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -46,11 +46,23 @@ export default async function handler(req) {
       ];
     }
 
+    // Add web search tool if enabled
+    if (webSearch) {
+      requestOptions.tools = [
+        {
+          type: 'web_search_20250305',
+          name: 'web_search',
+          max_uses: 3 // Limit searches per request for cost control
+        }
+      ];
+    }
+
     // Create a streaming response
     const stream = await anthropic.messages.stream(requestOptions);
 
-    // Track token usage
+    // Track token usage and search results
     let usage = null;
+    let searchResults = [];
 
     // Convert Anthropic stream to Response stream
     const encoder = new TextEncoder();
@@ -62,6 +74,20 @@ export default async function handler(req) {
               const text = chunk.delta.text;
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
             }
+
+            // Capture web search results from content blocks
+            if (chunk.type === 'content_block_start' && chunk.content_block?.type === 'web_search_tool_result') {
+              // Send indicator that search is happening
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ searching: true })}\n\n`));
+            }
+
+            // Capture search result content
+            if (chunk.type === 'content_block_delta' && chunk.delta?.type === 'web_search_tool_result_delta') {
+              if (chunk.delta.content) {
+                searchResults.push(...chunk.delta.content);
+              }
+            }
+
             // Capture usage from message_delta or message_stop events
             if (chunk.type === 'message_delta' && chunk.usage) {
               usage = { ...usage, ...chunk.usage };
@@ -72,6 +98,26 @@ export default async function handler(req) {
           const finalMessage = await stream.finalMessage();
           if (finalMessage?.usage) {
             usage = finalMessage.usage;
+          }
+
+          // Extract citations/sources from final message content
+          if (finalMessage?.content) {
+            for (const block of finalMessage.content) {
+              if (block.type === 'web_search_tool_result' && block.content) {
+                searchResults = block.content.filter(item =>
+                  item.type === 'web_search_result'
+                ).map(item => ({
+                  title: item.title,
+                  url: item.url,
+                  snippet: item.encrypted_content ? '[encrypted]' : (item.page_content?.slice(0, 200) || '')
+                }));
+              }
+            }
+          }
+
+          // Send search results if any
+          if (searchResults.length > 0) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ sources: searchResults })}\n\n`));
           }
 
           // Send usage data before closing

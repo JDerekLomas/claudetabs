@@ -16,9 +16,16 @@ While vibecoding, you can open up new tabs to learn more about the software libr
 
 ### Learning Mode
 
-With learning mode on, when you ask Claude to perform a task—like create some vibecoded software—Claude will highlight key technical terms weighted toward your learning goals (as expressed in your editable learner profile).
+With learning mode on, when you ask Claude to perform a task—like create some vibecoded software—Claude will highlight key concepts worth exploring deeper. These aren't limited to technical terms—they can include design principles, historical context, cognitive concepts, or any idea with interesting depth.
 
-**Learning Links** use the `[[term]]` syntax to highlight relevant concepts. Clicking opens a Deep Dive tab with a streaming explanation from Claude Haiku for fast response times. Learning links are weighted toward the learner's stated interests and goals.
+**Learning Links** use the `[[term]]` syntax to highlight relevant concepts. Clicking opens a Deep Dive tab with a streaming explanation from Claude Haiku for fast response times.
+
+### Learning History
+
+Claude Tabs tracks the concepts you explore in Deep Dive tabs. This learning history is:
+- Included in your learner profile so Claude knows what you've already studied
+- Persisted across sessions (via localStorage and Supabase cloud sync)
+- Used to avoid re-explaining concepts you've already explored
 
 ### Per-Chat Tabs
 
@@ -50,6 +57,22 @@ Code blocks with `jsx`, `tsx`, `react`, or `html` languages show a "Preview" but
 | **Opt + ↑** | Open new learning tab |
 | **Opt + ↓** | Close current tab (if not main) |
 
+## Data Persistence
+
+Claude Tabs stores your data in two places:
+
+### localStorage (Instant)
+- Chat history
+- User profile
+- Learning mode settings
+- Learning history
+- Works offline, device-specific
+
+### Supabase (Cloud Sync)
+- All data syncs to cloud with 2-second debounce
+- Access your data from any device
+- Falls back gracefully if unavailable
+
 ## Settings
 
 Access settings via the graduation cap icon in the sidebar:
@@ -70,29 +93,50 @@ View the system prompts used for:
 - Deep Dive explanations
 - Side conversations
 
-## How to Use
+## Installation
 
-### Installation
+### Prerequisites
+- Node.js 20.19+ or 22.12+
+- npm
+
+### Local Development
 
 ```bash
+# Install dependencies
 npm install
-```
 
-### Running Locally
-
-```bash
+# Run development server
 npm run dev
 ```
 
 Then open your browser to `http://localhost:5173`
 
+### Environment Variables
+
+Create a `.env` file for local development:
+
+```env
+ANTHROPIC_API_KEY=your_api_key_here
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
 ### Deploying to Vercel
 
-This project is configured for Vercel deployment with serverless API integration.
-
 1. Connect your GitHub repository to Vercel
-2. Set the `ANTHROPIC_API_KEY` environment variable in Vercel project settings
+2. Set environment variables in Vercel project settings:
+   - `ANTHROPIC_API_KEY` - Your Anthropic API key
+   - `VITE_SUPABASE_URL` - Your Supabase project URL
+   - `VITE_SUPABASE_ANON_KEY` - Your Supabase anon key
 3. Deploy
+
+### Supabase Setup
+
+Run the SQL in `supabase-schema.sql` in your Supabase SQL Editor to create the required tables:
+- `user_profiles` - Learner profiles
+- `chats` - Chat history
+- `learning_history` - Concepts explored
+- `user_settings` - Learning mode, active chat, etc.
 
 ## Technical Stack
 
@@ -101,6 +145,7 @@ This project is configured for Vercel deployment with serverless API integration
 - **Sandpack** for live React code previews
 - **KaTeX** for LaTeX math rendering
 - **Lucide React** for icons
+- **Supabase** for cloud data persistence
 - **Claude API** via Vercel Edge functions with streaming
   - Sonnet 4 for main chat
   - Haiku for Deep Dives and side conversations
@@ -111,29 +156,36 @@ This project is configured for Vercel deployment with serverless API integration
 ```
 claudetabs/
 ├── api/
-│   └── chat.js              # Vercel serverless function for Claude API
+│   ├── chat.js              # Claude API serverless function
+│   └── mcq.js               # MCQMCP quiz integration
 ├── src/
-│   ├── App.jsx              # Main application with all features
+│   ├── App.jsx              # Main application
 │   ├── components/
-│   │   ├── ArtifactPreview.jsx   # Sandpack-based React preview
-│   │   └── MarkdownRenderer.jsx  # Markdown with learning links + LaTeX
+│   │   ├── ArtifactPreview.jsx   # Sandpack React preview
+│   │   └── MarkdownRenderer.jsx  # Markdown + learning links + LaTeX
+│   ├── utils/
+│   │   ├── supabase.js      # Supabase client and sync functions
+│   │   └── mcqmcp.js        # Quiz/MCP utilities
 │   ├── main.jsx             # Entry point
 │   └── index.css            # Global styles + Tailwind
-├── index.html               # HTML template
+├── supabase-schema.sql      # Database schema
 ├── vercel.json              # Vercel configuration
 ├── tailwind.config.js       # Tailwind configuration
-├── package.json             # Dependencies and scripts
-└── README.md                # This file
+└── package.json             # Dependencies and scripts
 ```
 
 ## API Integration
 
-The app uses a Vercel serverless function (`/api/chat`) that:
-- Handles streaming responses from Claude API
-- Keeps API key secure server-side
-- Supports model selection (Sonnet for main, Haiku for side chats)
-- Uses `[[term]]` syntax for learning links
-- Supports up to 8192 tokens per response
+### Claude API (`/api/chat`)
+- Streaming responses from Claude
+- Server-side API key security
+- Model selection (Sonnet for main, Haiku for side chats)
+- Up to 8192 tokens per response
+
+### MCQMCP Integration (`/api/mcq`)
+- Quiz generation for learning objectives
+- Answer recording and mastery tracking
+- Fallback to Claude-generated questions
 
 ## Architecture Notes
 
@@ -144,11 +196,13 @@ Each chat stores:
 - `tabs`: Array of tabs (main chat, Deep Dives, artifacts)
 - `activeTabId`: Currently selected tab
 
+### Data Sync Strategy
+1. Load from localStorage immediately (fast)
+2. Load from Supabase and merge (cloud wins if exists)
+3. Save to both on changes (debounced 2s for Supabase)
+
 ### Stale Closure Prevention
 Uses `useRef` to track `activeChatId` for async operations, ensuring tabs are added to the correct chat even during streaming responses.
-
-### Event Delegation for Learning Links
-Learning links use `mousedown` event delegation to fire immediately before React re-renders during streaming, preventing missed clicks.
 
 ## Design Philosophy
 
@@ -158,15 +212,6 @@ The interface matches Claude's production design while adding innovative learnin
 - Clean typography with serif fonts for AI responses
 - Subtle animations and transitions
 - Mobile-responsive layout
-
-## Future Enhancements
-
-- Voice-based side conversations
-- Persistent learning history and knowledge base
-- Export learning paths
-- Collaborative learning sessions
-- Integration with external knowledge sources
-- Advanced concept mapping
 
 ## Demo
 

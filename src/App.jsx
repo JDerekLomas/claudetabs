@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   MessageSquare,
   X,
@@ -31,6 +31,26 @@ import {
 } from 'lucide-react';
 import MarkdownRenderer from './components/MarkdownRenderer';
 import ArtifactPreview from './components/ArtifactPreview';
+import {
+  getUserId,
+  saveUserProfile,
+  loadUserProfile,
+  saveChats,
+  loadChats,
+  saveLearningHistory,
+  loadLearningHistory,
+  saveUserSettings,
+  loadUserSettings
+} from './utils/supabase';
+
+// --- LocalStorage Keys ---
+const STORAGE_KEYS = {
+  CHATS: 'claudetabs_chats',
+  ACTIVE_CHAT: 'claudetabs_active_chat',
+  USER_PROFILE: 'claudetabs_user_profile',
+  LEARNING_MODE: 'claudetabs_learning_mode',
+  LEARNING_HISTORY: 'claudetabs_learning_history'
+};
 
 // --- Design System Constants ---
 const COLORS = {
@@ -64,6 +84,30 @@ const DEFAULT_CHAT = {
   messages: []
 };
 
+// Default chats for first-time users
+const DEFAULT_CHATS = {
+  'chat-1733000003': {
+    title: 'Help me build a marble run in three.js',
+    messages: [],
+    tabs: [{ id: 'main', title: 'Help me build a marble run in three.js', type: 'chat', content: null }],
+    activeTabId: 'main'
+  },
+  'chat-1733000002': {
+    title: 'Understanding Redux Middleware',
+    messages: [],
+    tabs: [{ id: 'main', title: 'Understanding Redux Middleware', type: 'chat', content: null }],
+    activeTabId: 'main'
+  },
+  'chat-1733000001': {
+    title: 'CSS Grid Layouts',
+    messages: [],
+    tabs: [{ id: 'main', title: 'CSS Grid Layouts', type: 'chat', content: null }],
+    activeTabId: 'main'
+  }
+};
+
+const DEFAULT_USER_PROFILE = "I'm a professor of positive AI at Delft University of Technology. I have a background in cognitive science, art, human-centered design, and HCI.|||I want to make top-level connections in AI & experience design, particularly in education.|||I want to understand React more deeply and keep getting better and better at vibecoding.";
+
 // --- Main Application ---
 export default function ClaudeLearningPrototype() {
   // UI State
@@ -71,47 +115,173 @@ export default function ClaudeLearningPrototype() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('profile'); // 'profile' | 'prompts'
   const [searchModalOpen, setSearchModalOpen] = useState(false);
-  const [learningModeOn, setLearningModeOn] = useState(true);
+
+  // Learning mode - load from localStorage
+  const [learningModeOn, setLearningModeOn] = useState(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.LEARNING_MODE);
+      return stored !== null ? JSON.parse(stored) : true;
+    } catch {
+      return true;
+    }
+  });
 
   // Selection State
   const [selectionBox, setSelectionBox] = useState(null);
   const [selectedText, setSelectedText] = useState("");
 
-  // User Profile State (Background ||| Aspirations ||| Learning Goals)
-  const [userProfile, setUserProfile] = useState("I'm a professor of positive AI at Delft University of Technology. I have a background in cognitive science, art, human-centered design, and HCI.|||I want to make top-level connections in AI & experience design, particularly in education.|||I want to understand React more deeply and keep getting better and better at vibecoding.");
+  // User Profile State - load from localStorage
+  const [userProfile, setUserProfile] = useState(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.USER_PROFILE);
+      return stored || DEFAULT_USER_PROFILE;
+    } catch {
+      return DEFAULT_USER_PROFILE;
+    }
+  });
 
   // Default tabs for a new chat
   const DEFAULT_TABS = [{ id: 'main', title: 'New Chat', type: 'chat', content: null }];
 
-  // Chat Data State - store messages AND tabs per chat
-  // IDs use timestamps for proper sorting (newest first)
-  const [chats, setChats] = useState({
-    'chat-1733000003': {
-      title: 'Help me build a marble run in three.js',
-      messages: DEFAULT_CHAT.messages,
-      tabs: [{ id: 'main', title: 'Help me build a marble run in three.js', type: 'chat', content: null }],
-      activeTabId: 'main'
-    },
-    'chat-1733000002': {
-      title: 'Understanding Redux Middleware',
-      messages: [],
-      tabs: [{ id: 'main', title: 'Understanding Redux Middleware', type: 'chat', content: null }],
-      activeTabId: 'main'
-    },
-    'chat-1733000001': {
-      title: 'CSS Grid Layouts',
-      messages: [],
-      tabs: [{ id: 'main', title: 'CSS Grid Layouts', type: 'chat', content: null }],
-      activeTabId: 'main'
+  // Chat Data State - load from localStorage
+  const [chats, setChats] = useState(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.CHATS);
+      return stored ? JSON.parse(stored) : DEFAULT_CHATS;
+    } catch {
+      return DEFAULT_CHATS;
     }
   });
-  const [activeChatId, setActiveChatId] = useState('chat-1733000003');
+
+  // Active chat ID - load from localStorage
+  const [activeChatId, setActiveChatId] = useState(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.ACTIVE_CHAT);
+      return stored || 'chat-1733000003';
+    } catch {
+      return 'chat-1733000003';
+    }
+  });
+
+  // Learning history - tracks concepts explored in Deep Dive tabs
+  // Format: [{ term: string, timestamp: number, chatId: string }]
+  const [learningHistory, setLearningHistory] = useState(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.LEARNING_HISTORY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
 
   // Ref to always have access to the latest activeChatId (prevents stale closures)
   const activeChatIdRef = useRef(activeChatId);
   useEffect(() => {
     activeChatIdRef.current = activeChatId;
   }, [activeChatId]);
+
+  // Persist state to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.CHATS, JSON.stringify(chats));
+    } catch (e) {
+      console.warn('Failed to save chats to localStorage:', e);
+    }
+  }, [chats]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_CHAT, activeChatId);
+    } catch (e) {
+      console.warn('Failed to save activeChatId to localStorage:', e);
+    }
+  }, [activeChatId]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.USER_PROFILE, userProfile);
+    } catch (e) {
+      console.warn('Failed to save userProfile to localStorage:', e);
+    }
+  }, [userProfile]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.LEARNING_MODE, JSON.stringify(learningModeOn));
+    } catch (e) {
+      console.warn('Failed to save learningModeOn to localStorage:', e);
+    }
+  }, [learningModeOn]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.LEARNING_HISTORY, JSON.stringify(learningHistory));
+    } catch (e) {
+      console.warn('Failed to save learningHistory to localStorage:', e);
+    }
+  }, [learningHistory]);
+
+  // --- Supabase Sync ---
+  const userId = getUserId();
+  const [supabaseLoaded, setSupabaseLoaded] = useState(false);
+
+  // Load from Supabase on mount (merge with localStorage)
+  useEffect(() => {
+    const loadFromSupabase = async () => {
+      try {
+        const [cloudProfile, cloudChats, cloudHistory, cloudSettings] = await Promise.all([
+          loadUserProfile(userId),
+          loadChats(userId),
+          loadLearningHistory(userId),
+          loadUserSettings(userId)
+        ]);
+
+        // Merge: prefer Supabase data if it exists (cloud wins)
+        if (cloudProfile) setUserProfile(cloudProfile);
+        if (cloudChats) setChats(cloudChats);
+        if (cloudHistory) setLearningHistory(cloudHistory);
+        if (cloudSettings) {
+          if (cloudSettings.learningModeOn !== undefined) setLearningModeOn(cloudSettings.learningModeOn);
+          if (cloudSettings.activeChatId) setActiveChatId(cloudSettings.activeChatId);
+        }
+
+        setSupabaseLoaded(true);
+      } catch (e) {
+        console.warn('Failed to load from Supabase:', e);
+        setSupabaseLoaded(true);
+      }
+    };
+
+    loadFromSupabase();
+  }, [userId]);
+
+  // Debounced save to Supabase
+  const saveTimeoutRef = useRef(null);
+  const saveToSupabase = useCallback(() => {
+    if (!supabaseLoaded) return;
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await Promise.all([
+          saveUserProfile(userId, userProfile),
+          saveChats(userId, chats),
+          saveLearningHistory(userId, learningHistory),
+          saveUserSettings(userId, { learningModeOn, activeChatId })
+        ]);
+      } catch (e) {
+        console.warn('Failed to save to Supabase:', e);
+      }
+    }, 2000); // 2 second debounce
+  }, [userId, userProfile, chats, learningHistory, learningModeOn, activeChatId, supabaseLoaded]);
+
+  // Trigger save when data changes
+  useEffect(() => {
+    saveToSupabase();
+  }, [userProfile, chats, learningHistory, learningModeOn, activeChatId, saveToSupabase]);
 
   // Derived state for current chat
   const messages = chats[activeChatId]?.messages || [];
@@ -211,37 +381,63 @@ export default function ClaudeLearningPrototype() {
       return `You are Claude, a helpful AI assistant. Respond naturally and helpfully.`;
     }
 
+    // Build learning history summary (last 15 unique terms)
+    const recentLearning = learningHistory.slice(0, 15).map(h => h.term);
+    const learningHistoryText = recentLearning.length > 0
+      ? `\n\nRECENT LEARNING HISTORY (concepts they've explored):\n${recentLearning.join(', ')}`
+      : '';
+
     return `You are Claude, a helpful AI assistant with Learning Mode enabled. Your goal is to help the user complete their task while supporting their learning.
 
 LEARNER PROFILE:
-${userProfile}
+${userProfile}${learningHistoryText}
 
 ---
 
 RESPONSE APPROACH:
 
-1. Complete the user's task effectively.
+1. Complete the user's task effectively. Match your response format to what the user actually needs:
+   - Conceptual questions → explanations and discussion
+   - "How does X work?" → explain the concept, use code snippets only if they clarify
+   - "Build me X" or "Write code for X" → provide working code
+   - Debugging help → analyze the issue, suggest fixes
 
-2. Include 2-4 learning links [[term]] weighted toward the learner's interests and goals above. If they want to understand React deeply, highlight React concepts. If they're learning about databases, highlight those patterns.
+2. Only write full code blocks when the user explicitly asks for code or when code is clearly the best way to answer. For conceptual discussions, prefer prose with small inline examples if needed.
 
-3. For coding tasks: Brief explanation with learning links FIRST, then code.
+3. Include 2-4 learning links [[term]] for concepts worth exploring deeper.
 
 ---
 
 LEARNING LINKS - Format: [[term]]
 
-Prioritize terms that match the learner's stated interests:
-- Concepts they said they want to learn
-- Foundational ideas for their learning goals
-- Patterns and techniques in their focus areas
+Include links for:
+- Key concepts in your response that someone might not fully understand
+- Ideas that deserve deeper exploration beyond a quick mention
+- Terms that connect to broader principles or mental models
+- Anything you reference that has interesting depth behind it
 
-Also include:
-- Library/framework names relevant to the task
-- Technical terms that appear in the code
+These don't need to be technical - they could be historical context, design principles, cognitive concepts, philosophical ideas, or practical techniques. The goal is to surface "rabbit holes" worth exploring.
+
+When relevant, weight toward the learner's stated interests:
+${userProfile}
 
 ---
 
-REACT ARTIFACTS:
+WHEN TO USE CODE:
+- User explicitly asks to build/create/write something
+- User shares code and asks for modifications
+- A working example is genuinely the clearest explanation
+- User is debugging and needs a fix
+
+WHEN TO AVOID CODE:
+- User asks "what is X?" or "how does X work?" → explain conceptually
+- User asks for advice or opinions → discuss tradeoffs
+- User is exploring ideas → have a conversation
+- Code would be redundant with your explanation
+
+---
+
+REACT ARTIFACTS (only when building complete components):
 - Use \`\`\`jsx code blocks with complete components
 - Include: \`export default function ComponentName()\`
 - Explicit imports: \`import { useState, useEffect } from 'react'\`
@@ -756,6 +952,22 @@ Toggle Learning Mode in settings. Click a highlighted concept. Follow your curio
 
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(newTabId);
+
+    // Track in learning history (avoid duplicates within last 20 items)
+    setLearningHistory(prev => {
+      const isDuplicate = prev.slice(0, 20).some(
+        item => item.term.toLowerCase() === term.toLowerCase()
+      );
+      if (isDuplicate) return prev;
+
+      const newEntry = {
+        term,
+        timestamp: Date.now(),
+        chatId: activeChatId
+      };
+      // Keep last 50 items
+      return [newEntry, ...prev].slice(0, 50);
+    });
 
     // Start streaming (non-blocking)
     fetchConceptDataStreaming(term, newTabId);

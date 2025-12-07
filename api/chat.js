@@ -27,20 +27,30 @@ export default async function handler(req) {
       apiKey: apiKey,
     });
 
-    // Build request options
+    // Build request options with prompt caching
     const requestOptions = {
       model: model,
       max_tokens: 8192,
       messages: messages,
     };
 
-    // Add system prompt if provided
+    // Add system prompt with cache control if provided
+    // The system prompt (learner profile + learning history) is cached for efficiency
     if (system) {
-      requestOptions.system = system;
+      requestOptions.system = [
+        {
+          type: 'text',
+          text: system,
+          cache_control: { type: 'ephemeral' }
+        }
+      ];
     }
 
     // Create a streaming response
     const stream = await anthropic.messages.stream(requestOptions);
+
+    // Track token usage
+    let usage = null;
 
     // Convert Anthropic stream to Response stream
     const encoder = new TextEncoder();
@@ -52,7 +62,23 @@ export default async function handler(req) {
               const text = chunk.delta.text;
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
             }
+            // Capture usage from message_delta or message_stop events
+            if (chunk.type === 'message_delta' && chunk.usage) {
+              usage = { ...usage, ...chunk.usage };
+            }
           }
+
+          // Get final message for complete usage stats
+          const finalMessage = await stream.finalMessage();
+          if (finalMessage?.usage) {
+            usage = finalMessage.usage;
+          }
+
+          // Send usage data before closing
+          if (usage) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ usage })}\n\n`));
+          }
+
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();
         } catch (error) {

@@ -351,6 +351,15 @@ export default function ClaudeLearningPrototype() {
   const [sideInputText, setSideInputText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
 
+  // Token usage tracking
+  const [tokenUsage, setTokenUsage] = useState({
+    totalInput: 0,
+    totalOutput: 0,
+    cacheCreation: 0,
+    cacheRead: 0,
+    lastRequest: null
+  });
+
   // Concept cache for Deep Dive tab summaries
   const [conceptCache, setConceptCache] = useState(DEFAULT_PRELOADED_SUMMARIES);
 
@@ -754,6 +763,21 @@ YOUR BEHAVIOR:
                 setMessages(prev => prev.map(m =>
                   m.id === aiMsgId ? { ...m, text: fullText } : m
                 ));
+              }
+              // Capture token usage
+              if (parsed.usage) {
+                setTokenUsage(prev => ({
+                  totalInput: prev.totalInput + (parsed.usage.input_tokens || 0),
+                  totalOutput: prev.totalOutput + (parsed.usage.output_tokens || 0),
+                  cacheCreation: prev.cacheCreation + (parsed.usage.cache_creation_input_tokens || 0),
+                  cacheRead: prev.cacheRead + (parsed.usage.cache_read_input_tokens || 0),
+                  lastRequest: {
+                    input: parsed.usage.input_tokens || 0,
+                    output: parsed.usage.output_tokens || 0,
+                    cacheCreation: parsed.usage.cache_creation_input_tokens || 0,
+                    cacheRead: parsed.usage.cache_read_input_tokens || 0
+                  }
+                }));
               }
             } catch {
               // Ignore parse errors
@@ -1684,10 +1708,23 @@ Toggle Learning Mode in settings. Click a highlighted concept. Follow your curio
                     </div>
                 </div>
 
-                {/* Disclaimer */}
-                <p className="text-center text-xs text-[#9B9B9B] mt-3">
-                    Claude can make mistakes. Please double-check responses.
-                </p>
+                {/* Disclaimer and Token Usage */}
+                <div className="flex items-center justify-center gap-4 mt-3">
+                    <p className="text-xs text-[#9B9B9B]">
+                        Claude can make mistakes. Please double-check responses.
+                    </p>
+                    {tokenUsage.lastRequest && (
+                      <div className="flex items-center gap-2 text-xs text-[#9B9B9B] border-l border-[#E6E4DD] pl-4">
+                        <span title="Input tokens">↓{tokenUsage.lastRequest.input.toLocaleString()}</span>
+                        <span title="Output tokens">↑{tokenUsage.lastRequest.output.toLocaleString()}</span>
+                        {tokenUsage.lastRequest.cacheRead > 0 && (
+                          <span className="text-green-600" title="Tokens read from cache (90% savings)">
+                            ⚡{tokenUsage.lastRequest.cacheRead.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                </div>
             </div>
           )}
 

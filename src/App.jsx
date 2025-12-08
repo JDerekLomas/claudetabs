@@ -385,7 +385,8 @@ export default function ClaudeLearningPrototype() {
     correctAnswer: null,
     selectedAnswer: null,
     answered: false,
-    wasCorrect: null
+    wasCorrect: null,
+    explanation: null
   });
 
   // Concept cache for Deep Dive tab summaries
@@ -423,22 +424,27 @@ export default function ClaudeLearningPrototype() {
       correctAnswer: null,
       selectedAnswer: null,
       answered: false,
-      wasCorrect: null
+      wasCorrect: null,
+      explanation: null
     });
 
     try {
       const mcqUserId = getMcqUserId();
       const result = await generateQuestion(mcqUserId, topic, 'medium');
 
-      if (result.question && result.options) {
+      console.log('Quiz result:', result); // Debug log
+
+      if (result.question && result.options && Array.isArray(result.options) && result.options.length > 0) {
         setQuizState(prev => ({
           ...prev,
           loading: false,
           question: result.question,
           options: result.options,
-          correctAnswer: result.correct_answer
+          correctAnswer: result.correct_answer,
+          explanation: result.explanation || null
         }));
       } else {
+        console.error('Invalid question format:', result);
         throw new Error('Invalid question format');
       }
     } catch (error) {
@@ -446,7 +452,7 @@ export default function ClaudeLearningPrototype() {
       setQuizState(prev => ({
         ...prev,
         loading: false,
-        question: 'Failed to generate question. Please try again.',
+        question: `Failed to generate question about "${topic}". Please try again.`,
         options: []
       }));
     }
@@ -487,7 +493,8 @@ export default function ClaudeLearningPrototype() {
       correctAnswer: null,
       selectedAnswer: null,
       answered: false,
-      wasCorrect: null
+      wasCorrect: null,
+      explanation: null
     });
   };
 
@@ -1504,7 +1511,7 @@ Toggle Learning Mode in settings. Click a highlighted concept. Follow your curio
                             </h3>
 
                             {/* Options */}
-                            {quizState.options.length > 0 && (
+                            {quizState.options.length > 0 ? (
                                 <div className="space-y-3">
                                     {quizState.options.map((option, idx) => {
                                         const isSelected = quizState.selectedAnswer === option;
@@ -1547,6 +1554,16 @@ Toggle Learning Mode in settings. Click a highlighted concept. Follow your curio
                                         );
                                     })}
                                 </div>
+                            ) : (
+                                /* Error state - no options */
+                                <div className="text-center py-4">
+                                    <button
+                                        onClick={() => handleStartQuiz(quizState.topic)}
+                                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+                                    >
+                                        Try Again
+                                    </button>
+                                </div>
                             )}
 
                             {/* Result feedback */}
@@ -1566,8 +1583,13 @@ Toggle Learning Mode in settings. Click a highlighted concept. Follow your curio
                                         )}
                                     </div>
                                     {!quizState.wasCorrect && (
-                                        <p className="text-sm opacity-80">
-                                            The correct answer was: {quizState.correctAnswer}
+                                        <p className="text-sm opacity-80 mb-2">
+                                            The correct answer was: <strong>{quizState.correctAnswer}</strong>
+                                        </p>
+                                    )}
+                                    {quizState.explanation && (
+                                        <p className="text-sm mt-2 pt-2 border-t border-current border-opacity-20">
+                                            {quizState.explanation}
                                         </p>
                                     )}
                                 </div>

@@ -18,39 +18,8 @@ export default async function handler(req) {
   try {
     const { tool, args } = await req.json();
 
-    // Call the MCQMCP REST API endpoint
-    const response = await fetch(`${MCQMCP_URL}/api/tools/call`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: tool,
-        arguments: args,
-      }),
-    });
-
-    if (response.ok) {
-      const result = await response.json();
-      // Transform REST API response to MCP content format for backwards compatibility
-      if (result.success && result.result) {
-        return new Response(JSON.stringify({
-          content: [{
-            type: 'text',
-            text: JSON.stringify(result.result)
-          }]
-        }), {
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      return new Response(JSON.stringify(result), {
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    // If MCQMCP server is unavailable, fall back to local generation
-    console.log('MCQMCP server unavailable, using fallback');
-
+    // For question generation, always use Claude to ensure topic relevance
+    // MCQMCP server returns pre-made questions that don't match the requested topic
     if (tool === 'mcq_generate') {
       return await generateQuestionWithClaude(args);
     }
@@ -139,7 +108,7 @@ async function generateQuestionWithClaude(args) {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 500,
+        max_tokens: 800,
         messages: [{
           role: 'user',
           content: `Generate a ${difficulty} multiple choice question to test understanding of "${objective}".
@@ -148,10 +117,11 @@ Return ONLY valid JSON in this exact format:
 {
   "question": "The question text",
   "options": ["Option A", "Option B", "Option C", "Option D"],
-  "correct_answer": "The correct option exactly as written in options"
+  "correct_answer": "The correct option exactly as written in options",
+  "explanation": "A brief explanation of why the correct answer is right"
 }
 
-Make the question specific and educational. The incorrect options should be plausible but clearly wrong to someone who understands the concept.`
+Make the question specific, educational, and directly about "${objective}". The incorrect options should be plausible but clearly wrong to someone who understands the concept.`
         }],
       }),
     });

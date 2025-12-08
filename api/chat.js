@@ -13,7 +13,7 @@ export default async function handler(req) {
   }
 
   try {
-    const { messages, system, model = 'claude-sonnet-4-5-20250929', webSearch = false } = await req.json();
+    const { messages, system, model = 'claude-sonnet-4-5-20250514', webSearch = false } = await req.json();
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {

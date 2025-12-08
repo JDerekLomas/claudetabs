@@ -29,7 +29,10 @@ import {
   Lightbulb,
   History,
   Globe,
-  ExternalLink
+  ExternalLink,
+  HelpCircle,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 import MarkdownRenderer from './components/MarkdownRenderer';
 import ArtifactPreview from './components/ArtifactPreview';
@@ -44,6 +47,11 @@ import {
   saveUserSettings,
   loadUserSettings
 } from './utils/supabase';
+import {
+  generateQuestion,
+  recordAnswer,
+  getUserId as getMcqUserId
+} from './utils/mcqmcp';
 
 // --- LocalStorage Keys ---
 const STORAGE_KEYS = {
@@ -367,6 +375,19 @@ export default function ClaudeLearningPrototype() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchSources, setSearchSources] = useState([]);
 
+  // Quiz state
+  const [quizState, setQuizState] = useState({
+    isOpen: false,
+    loading: false,
+    topic: null,
+    question: null,
+    options: [],
+    correctAnswer: null,
+    selectedAnswer: null,
+    answered: false,
+    wasCorrect: null
+  });
+
   // Concept cache for Deep Dive tab summaries
   const [conceptCache, setConceptCache] = useState(DEFAULT_PRELOADED_SUMMARIES);
 
@@ -389,6 +410,89 @@ export default function ClaudeLearningPrototype() {
       return [...prev.slice(0, insertIndex), newTab, ...prev.slice(insertIndex)];
     });
     setActiveTabId(artifactTabId);
+  };
+
+  // --- Quiz Handlers ---
+  const handleStartQuiz = async (topic) => {
+    setQuizState({
+      isOpen: true,
+      loading: true,
+      topic,
+      question: null,
+      options: [],
+      correctAnswer: null,
+      selectedAnswer: null,
+      answered: false,
+      wasCorrect: null
+    });
+
+    try {
+      const mcqUserId = getMcqUserId();
+      const result = await generateQuestion(mcqUserId, topic, 'medium');
+
+      if (result.question && result.options) {
+        setQuizState(prev => ({
+          ...prev,
+          loading: false,
+          question: result.question,
+          options: result.options,
+          correctAnswer: result.correct_answer
+        }));
+      } else {
+        throw new Error('Invalid question format');
+      }
+    } catch (error) {
+      console.error('Quiz generation error:', error);
+      setQuizState(prev => ({
+        ...prev,
+        loading: false,
+        question: 'Failed to generate question. Please try again.',
+        options: []
+      }));
+    }
+  };
+
+  const handleSelectAnswer = async (answer) => {
+    if (quizState.answered) return;
+
+    const isCorrect = answer === quizState.correctAnswer;
+    setQuizState(prev => ({
+      ...prev,
+      selectedAnswer: answer,
+      answered: true,
+      wasCorrect: isCorrect
+    }));
+
+    // Record the answer
+    try {
+      const mcqUserId = getMcqUserId();
+      await recordAnswer(
+        mcqUserId,
+        quizState.topic,
+        answer,
+        quizState.correctAnswer
+      );
+    } catch (error) {
+      console.error('Failed to record answer:', error);
+    }
+  };
+
+  const handleCloseQuiz = () => {
+    setQuizState({
+      isOpen: false,
+      loading: false,
+      topic: null,
+      question: null,
+      options: [],
+      correctAnswer: null,
+      selectedAnswer: null,
+      answered: false,
+      wasCorrect: null
+    });
+  };
+
+  const handleNextQuestion = () => {
+    handleStartQuiz(quizState.topic);
   };
 
   // --- System Prompts ---
@@ -1205,18 +1309,24 @@ Toggle Learning Mode in settings. Click a highlighted concept. Follow your curio
     return (
       <div className="flex-1 flex flex-col bg-white animate-in slide-in-from-right-10 duration-300">
         <div className="p-6 md:p-8 pb-4 border-b border-gray-100">
-             <div className="flex items-center gap-2 text-[#D97757] text-xs font-bold tracking-wider uppercase mb-2">
-                <Sparkles size={12} />
-                Deep Dive
-            </div>
+             <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[#D97757] text-xs font-bold tracking-wider uppercase mb-2">
+                    <Sparkles size={12} />
+                    Deep Dive
+                </div>
+                {!activeTab.loading && (
+                  <button
+                    onClick={() => handleStartQuiz(activeTab.title)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium hover:bg-purple-100 transition-colors"
+                  >
+                    <HelpCircle size={16} />
+                    Quiz Me
+                  </button>
+                )}
+             </div>
             <h1 className={`text-3xl md:text-4xl ${FONTS.serif} text-[#141413] leading-tight`}>
                 {activeTab.title}
             </h1>
-            {/* Pre-generated summary - commented out to test pure Haiku streaming
-            <p className="text-sm text-gray-500 mt-2 font-serif italic border-l-2 border-[#D97757] pl-3">
-                {activeTab.content?.short}
-            </p>
-            */}
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 md:p-8">
@@ -1360,6 +1470,130 @@ Toggle Learning Mode in settings. Click a highlighted concept. Follow your curio
                         ))}
                     </div>
                 </div>
+            </div>
+        </div>
+      )}
+
+      {/* Quiz Modal */}
+      {quizState.isOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleCloseQuiz} />
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+                {/* Header */}
+                <div className="p-4 border-b border-[#E6E4DD] bg-purple-50 flex justify-between items-center">
+                    <div className="flex items-center gap-2 text-purple-700 font-semibold text-sm uppercase tracking-wide">
+                        <HelpCircle size={16} /> Quiz: {quizState.topic}
+                    </div>
+                    <button onClick={handleCloseQuiz}>
+                        <X size={18} className="text-gray-400 hover:text-gray-600" />
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="p-6">
+                    {quizState.loading ? (
+                        <div className="flex flex-col items-center py-10">
+                            <Loader2 className="w-8 h-8 text-purple-600 animate-spin mb-3" />
+                            <p className="text-sm text-gray-500">Generating question...</p>
+                        </div>
+                    ) : (
+                        <>
+                            {/* Question */}
+                            <h3 className={`text-xl ${FONTS.serif} text-[#141413] mb-6 leading-relaxed`}>
+                                {quizState.question}
+                            </h3>
+
+                            {/* Options */}
+                            {quizState.options.length > 0 && (
+                                <div className="space-y-3">
+                                    {quizState.options.map((option, idx) => {
+                                        const isSelected = quizState.selectedAnswer === option;
+                                        const isCorrect = option === quizState.correctAnswer;
+                                        const showResult = quizState.answered;
+
+                                        let buttonClass = "w-full text-left p-4 rounded-xl border-2 transition-all ";
+                                        if (showResult) {
+                                            if (isCorrect) {
+                                                buttonClass += "border-green-500 bg-green-50 text-green-800";
+                                            } else if (isSelected && !isCorrect) {
+                                                buttonClass += "border-red-500 bg-red-50 text-red-800";
+                                            } else {
+                                                buttonClass += "border-gray-200 bg-gray-50 text-gray-500";
+                                            }
+                                        } else {
+                                            buttonClass += "border-[#E6E4DD] hover:border-purple-400 hover:bg-purple-50";
+                                        }
+
+                                        return (
+                                            <button
+                                                key={idx}
+                                                onClick={() => handleSelectAnswer(option)}
+                                                disabled={quizState.answered}
+                                                className={buttonClass}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <span className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-sm font-medium shrink-0">
+                                                        {String.fromCharCode(65 + idx)}
+                                                    </span>
+                                                    <span className="flex-1">{option}</span>
+                                                    {showResult && isCorrect && (
+                                                        <CheckCircle size={20} className="text-green-600 shrink-0" />
+                                                    )}
+                                                    {showResult && isSelected && !isCorrect && (
+                                                        <XCircle size={20} className="text-red-600 shrink-0" />
+                                                    )}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {/* Result feedback */}
+                            {quizState.answered && (
+                                <div className={`mt-6 p-4 rounded-xl ${quizState.wasCorrect ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800'}`}>
+                                    <div className="flex items-center gap-2 font-medium mb-1">
+                                        {quizState.wasCorrect ? (
+                                            <>
+                                                <CheckCircle size={18} />
+                                                Correct!
+                                            </>
+                                        ) : (
+                                            <>
+                                                <XCircle size={18} />
+                                                Not quite
+                                            </>
+                                        )}
+                                    </div>
+                                    {!quizState.wasCorrect && (
+                                        <p className="text-sm opacity-80">
+                                            The correct answer was: {quizState.correctAnswer}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                {/* Footer */}
+                {quizState.answered && (
+                    <div className="p-4 border-t border-[#E6E4DD] bg-[#FAF9F6] flex justify-between">
+                        <button
+                            onClick={handleCloseQuiz}
+                            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                            Done
+                        </button>
+                        <button
+                            onClick={handleNextQuestion}
+                            className="flex items-center gap-2 px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+                        >
+                            Next Question
+                            <ArrowRight size={16} />
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
       )}
@@ -1764,7 +1998,7 @@ Toggle Learning Mode in settings. Click a highlighted concept. Follow your curio
                         </div>
                         <div className="flex items-center gap-2">
                             <button className="flex items-center gap-1 px-2 py-1 text-sm text-[#6B6B6B] hover:bg-[#EFECE6] rounded-lg transition-colors">
-                                <span>Sonnet 4</span>
+                                <span>Sonnet 4.5</span>
                                 <ChevronDown size={14} />
                             </button>
                             <button
@@ -1792,6 +2026,15 @@ Toggle Learning Mode in settings. Click a highlighted concept. Follow your curio
                             ⚡{tokenUsage.lastRequest.cacheRead.toLocaleString()}
                           </span>
                         )}
+                        <span className="text-[#9B9B9B]" title="Estimated cost for this request">
+                          ${(
+                            // Sonnet 4.5: $3/M input, $15/M output, $0.30/M cache read, $3.75/M cache write
+                            ((tokenUsage.lastRequest.input - (tokenUsage.lastRequest.cacheRead || 0)) * 3 / 1000000) +
+                            ((tokenUsage.lastRequest.cacheRead || 0) * 0.30 / 1000000) +
+                            ((tokenUsage.lastRequest.cacheCreation || 0) * 3.75 / 1000000) +
+                            (tokenUsage.lastRequest.output * 15 / 1000000)
+                          ).toFixed(4)}
+                        </span>
                       </div>
                     )}
                 </div>

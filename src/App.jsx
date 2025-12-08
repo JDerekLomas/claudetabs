@@ -386,7 +386,9 @@ export default function ClaudeLearningPrototype() {
     selectedAnswer: null,
     answered: false,
     wasCorrect: null,
-    explanation: null
+    explanation: null,
+    code: null,
+    source: null
   });
 
   // Concept cache for Deep Dive tab summaries
@@ -425,7 +427,9 @@ export default function ClaudeLearningPrototype() {
       selectedAnswer: null,
       answered: false,
       wasCorrect: null,
-      explanation: null
+      explanation: null,
+      code: null,
+      source: null
     });
 
     try {
@@ -441,7 +445,9 @@ export default function ClaudeLearningPrototype() {
           question: result.question,
           options: result.options,
           correctAnswer: result.correct_answer,
-          explanation: result.explanation || null
+          explanation: result.explanation || null,
+          code: result.code || null,
+          source: result.source || null
         }));
       } else {
         console.error('Invalid question format:', result);
@@ -494,7 +500,9 @@ export default function ClaudeLearningPrototype() {
       selectedAnswer: null,
       answered: false,
       wasCorrect: null,
-      explanation: null
+      explanation: null,
+      code: null,
+      source: null
     });
   };
 
@@ -1488,8 +1496,19 @@ Toggle Learning Mode in settings. Click a highlighted concept. Follow your curio
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
                 {/* Header */}
                 <div className="p-4 border-b border-[#E6E4DD] bg-purple-50 flex justify-between items-center">
-                    <div className="flex items-center gap-2 text-purple-700 font-semibold text-sm uppercase tracking-wide">
-                        <HelpCircle size={16} /> Quiz: {quizState.topic}
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 text-purple-700 font-semibold text-sm uppercase tracking-wide">
+                            <HelpCircle size={16} /> Quiz: {quizState.topic}
+                        </div>
+                        {quizState.source && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                quizState.source === 'ai-generated'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-green-100 text-green-700'
+                            }`}>
+                                {quizState.source === 'ai-generated' ? '✨ AI Generated' : '📚 Item Bank'}
+                            </span>
+                        )}
                     </div>
                     <button onClick={handleCloseQuiz}>
                         <X size={18} className="text-gray-400 hover:text-gray-600" />
@@ -1506,9 +1525,16 @@ Toggle Learning Mode in settings. Click a highlighted concept. Follow your curio
                     ) : (
                         <>
                             {/* Question */}
-                            <h3 className={`text-xl ${FONTS.serif} text-[#141413] mb-6 leading-relaxed`}>
+                            <h3 className={`text-xl ${FONTS.serif} text-[#141413] mb-4 leading-relaxed`}>
                                 {quizState.question}
                             </h3>
+
+                            {/* Code snippet if present */}
+                            {quizState.code && (
+                                <pre className="mb-6 p-4 bg-gray-900 text-gray-100 rounded-xl text-sm overflow-x-auto font-mono">
+                                    <code>{quizState.code}</code>
+                                </pre>
+                            )}
 
                             {/* Options */}
                             {quizState.options.length > 0 ? (

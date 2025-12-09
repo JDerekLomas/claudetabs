@@ -889,17 +889,21 @@ YOUR BEHAVIOR:
         }
 
         const chunk = decoder.decode(value);
+        console.log('[handleSendMessage] Raw chunk:', chunk);
         const lines = chunk.split('\n');
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
+            console.log('[handleSendMessage] Parsed data:', data);
             if (data === '[DONE]') break;
 
             try {
               const parsed = JSON.parse(data);
+              console.log('[handleSendMessage] Parsed JSON:', parsed);
               if (parsed.text) {
                 fullText += parsed.text;
+                console.log('[handleSendMessage] fullText now:', fullText);
 
                 // Update message in real-time
                 setMessages(prev => prev.map(m =>

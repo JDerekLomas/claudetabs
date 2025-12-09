@@ -838,8 +838,6 @@ YOUR BEHAVIOR:
   const handleSendMessage = async () => {
     if (!inputText.trim()) return;
 
-    console.log('[handleSendMessage] Starting with input:', inputText);
-
     const userMsg = { id: Date.now(), role: 'user', text: inputText };
     setMessages(prev => [...prev, userMsg]);
     setInputText("");
@@ -852,7 +850,6 @@ YOUR BEHAVIOR:
     const isNewChat = messages.length === 0;
 
     try {
-      console.log('[handleSendMessage] Fetching /api/chat...');
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -866,14 +863,9 @@ YOUR BEHAVIOR:
         }),
       });
 
-      console.log('[handleSendMessage] Response status:', response.status);
-      console.log('[handleSendMessage] Response headers:', Object.fromEntries(response.headers.entries()));
-      console.log('[handleSendMessage] Response body exists:', !!response.body);
-      console.log('[handleSendMessage] Response bodyUsed:', response.bodyUsed);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[handleSendMessage] Response not OK:', errorText);
+        console.error('Chat API error:', errorText);
         throw new Error('API request failed');
       }
 
@@ -883,34 +875,24 @@ YOUR BEHAVIOR:
       let aiMsgId = Date.now() + 1;
 
       // Add placeholder message
-      console.log('[handleSendMessage] Adding AI placeholder message with id:', aiMsgId);
       setMessages(prev => [...prev, { id: aiMsgId, role: 'assistant', text: '' }]);
 
-      console.log('[handleSendMessage] Starting to read stream...');
       while (true) {
         const { done, value } = await reader.read();
-        console.log('[handleSendMessage] reader.read() returned:', { done, valueLength: value?.length });
-        if (done) {
-          console.log('[handleSendMessage] Stream done, fullText length:', fullText.length);
-          break;
-        }
+        if (done) break;
 
         const chunk = decoder.decode(value);
-        console.log('[handleSendMessage] Raw chunk:', chunk);
         const lines = chunk.split('\n');
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
-            console.log('[handleSendMessage] Parsed data:', data);
             if (data === '[DONE]') break;
 
             try {
               const parsed = JSON.parse(data);
-              console.log('[handleSendMessage] Parsed JSON:', parsed);
               if (parsed.text) {
                 fullText += parsed.text;
-                console.log('[handleSendMessage] fullText now:', fullText);
 
                 // Update message in real-time
                 setMessages(prev => prev.map(m =>
@@ -960,10 +942,9 @@ YOUR BEHAVIOR:
       }
 
     } catch (error) {
-      console.error('[handleSendMessage] Error:', error);
+      console.error('Chat error:', error);
       setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', text: "Sorry, I couldn't connect to the server." }]);
     } finally {
-      console.log('[handleSendMessage] Finally block, setting isTyping to false');
       setIsTyping(false);
     }
   };

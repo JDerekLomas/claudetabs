@@ -838,6 +838,8 @@ YOUR BEHAVIOR:
   const handleSendMessage = async () => {
     if (!inputText.trim()) return;
 
+    console.log('[handleSendMessage] Starting with input:', inputText);
+
     const userMsg = { id: Date.now(), role: 'user', text: inputText };
     setMessages(prev => [...prev, userMsg]);
     setInputText("");
@@ -850,6 +852,7 @@ YOUR BEHAVIOR:
     const isNewChat = messages.length === 0;
 
     try {
+      console.log('[handleSendMessage] Fetching /api/chat...');
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -863,17 +866,27 @@ YOUR BEHAVIOR:
         }),
       });
 
+      console.log('[handleSendMessage] Response status:', response.status);
+      if (!response.ok) {
+        console.error('[handleSendMessage] Response not OK:', await response.text());
+        throw new Error('API request failed');
+      }
+
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let fullText = '';
       let aiMsgId = Date.now() + 1;
 
       // Add placeholder message
+      console.log('[handleSendMessage] Adding AI placeholder message with id:', aiMsgId);
       setMessages(prev => [...prev, { id: aiMsgId, role: 'assistant', text: '' }]);
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          console.log('[handleSendMessage] Stream done, fullText length:', fullText.length);
+          break;
+        }
 
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n');
@@ -936,8 +949,10 @@ YOUR BEHAVIOR:
       }
 
     } catch (error) {
+      console.error('[handleSendMessage] Error:', error);
       setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', text: "Sorry, I couldn't connect to the server." }]);
     } finally {
+      console.log('[handleSendMessage] Finally block, setting isTyping to false');
       setIsTyping(false);
     }
   };

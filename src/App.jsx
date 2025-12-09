@@ -867,8 +867,13 @@ YOUR BEHAVIOR:
       });
 
       console.log('[handleSendMessage] Response status:', response.status);
+      console.log('[handleSendMessage] Response headers:', Object.fromEntries(response.headers.entries()));
+      console.log('[handleSendMessage] Response body exists:', !!response.body);
+      console.log('[handleSendMessage] Response bodyUsed:', response.bodyUsed);
+
       if (!response.ok) {
-        console.error('[handleSendMessage] Response not OK:', await response.text());
+        const errorText = await response.text();
+        console.error('[handleSendMessage] Response not OK:', errorText);
         throw new Error('API request failed');
       }
 
@@ -881,8 +886,10 @@ YOUR BEHAVIOR:
       console.log('[handleSendMessage] Adding AI placeholder message with id:', aiMsgId);
       setMessages(prev => [...prev, { id: aiMsgId, role: 'assistant', text: '' }]);
 
+      console.log('[handleSendMessage] Starting to read stream...');
       while (true) {
         const { done, value } = await reader.read();
+        console.log('[handleSendMessage] reader.read() returned:', { done, valueLength: value?.length });
         if (done) {
           console.log('[handleSendMessage] Stream done, fullText length:', fullText.length);
           break;
